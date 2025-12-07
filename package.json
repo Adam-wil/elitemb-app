@@ -1,0 +1,55 @@
+{
+  "name": "elitemb",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A centralized matched betting platform designed to help users better manage their money and scale their betting operations through comprehensive cash flow tracking, bet management, and planning tools.",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "start": "node .output/server/index.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Adam-wil/elitemb-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Adam-wil/elitemb-app/issues"
+  },
+  "homepage": "https://github.com/Adam-wil/elitemb-app#readme",
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.6",
+    "@mui/material": "^7.3.6",
+    "@mui/x-data-grid": "^8.21.0",
+    "@mui/x-data-grid-premium": "^8.21.0",
+    "@mui/x-data-grid-pro": "^8.21.0",
+    "@mui/x-date-pickers": "^8.21.0",
+    "@mui/x-license": "^8.21.0",
+    "@tailwindcss/vite": "^4.1.17",
+    "@tanstack/react-router": "^1.139.16",
+    "@tanstack/react-start": "^1.139.14",
+    "dayjs": "^1.11.19",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.556.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1",
+    "tailwindcss": "^4.1.17",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tanstack/start-vite-plugin": "^1.91.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.6",
+    "vite-tsconfig-paths": "^5.1.4"
+  }
+}
