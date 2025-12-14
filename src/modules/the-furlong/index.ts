@@ -3,7 +3,7 @@
 
 export * from './components'
 export * from './types'
-export { parseRacingPlanExcel, type ParseResult, type ParseOptions } from './utils/excelParser'
+export { parseRacingPlanExcel, getSupportedDateFormats, type ParseResult, type ParseOptions } from './utils/excelParser'
 export {
   TIMEZONES,
   SOURCE_TIMEZONE,
@@ -61,6 +61,8 @@ export {
   saveTrackerData,
   updateTrackerEntry,
   removeTrackerEntry,
+  addTrackerEntry,
+  addTrackerEntryAbove,
   createDailyTrackerData,
   addTrackerEntries,
   getDatesWithTrackerData,
@@ -77,8 +79,12 @@ export {
   saveCommissionPreferences,
   getDefaultCommissionRate,
   setDefaultCommissionRate,
-  convertPlanEntryToTrackedEntry,
+  convertPlanEntryToTrackedEntries,
   lockInPlanEntries,
+  // Track-to-state commission utilities
+  getStateForTrack,
+  getCommissionForTrack,
+  type StateCommissionRate,
 } from './utils/trackerStorage'
 
 // Outcome logic exports

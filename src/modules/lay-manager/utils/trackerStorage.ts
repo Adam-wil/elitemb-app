@@ -10,9 +10,9 @@ import type {
 import type { RacingPlanEntry } from '../types'
 import { createDefaultSummary, createDefaultBetSide, DEFAULT_COMMISSION_RATE } from '../types'
 
-const TRACKER_STORAGE_KEY = 'elitemb-racing-tracker'
-const TRACKER_ARCHIVE_KEY = 'elitemb-racing-tracker-archives'
-const COMMISSION_PREFS_KEY = 'elitemb-commission-preferences'
+const TRACKER_STORAGE_KEY = 'elitemb-lay-tracker'
+const TRACKER_ARCHIVE_KEY = 'elitemb-lay-tracker-archives'
+const COMMISSION_PREFS_KEY = 'elitemb-lay-commission-preferences'
 const ARCHIVE_RETENTION_DAYS = 30
 
 // ============================================================

@@ -26,6 +26,7 @@ import {
   ExpandLess,
   ExpandMore,
   Timeline as TimelineIcon,
+  TableChart as TableChartIcon,
 } from '@mui/icons-material'
 import { CircleStar, CalendarDays } from 'lucide-react'
 import { useState } from 'react'
@@ -47,7 +48,8 @@ const navItems: NavItem[] = [
     icon: <CircleStar size={24} />,
     children: [
       { text: 'Planner', path: '/dashboard/the-furlong/planner', icon: <CalendarDays size={20} /> },
-      { text: 'Racing Tracker', path: '/dashboard/the-furlong/racing-tracker', icon: <TimelineIcon /> },
+      { text: 'Racing Manager', path: '/dashboard/the-furlong/racing-tracker', icon: <TimelineIcon /> },
+      { text: 'Lay Manager', path: '/dashboard/non-promo', icon: <TableChartIcon /> },
     ],
   },
   { text: 'Accounts', icon: <AccountBalanceIcon />, path: '/dashboard/accounts' },

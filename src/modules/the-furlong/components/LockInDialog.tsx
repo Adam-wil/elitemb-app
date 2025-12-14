@@ -18,7 +18,7 @@ import {
   RadioGroup,
 } from '@mui/material'
 import { Lock, AlertTriangle } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { RacingPlanEntry } from '../types'
 
 interface LockInDialogProps {
@@ -29,6 +29,7 @@ interface LockInDialogProps {
   date: string
   dateDisplay: string
   existingTrackerCount: number
+  totalSelectableCount?: number
 }
 
 export function LockInDialog({
@@ -39,6 +40,7 @@ export function LockInDialog({
   date,
   dateDisplay,
   existingTrackerCount,
+  totalSelectableCount = 0,
 }: LockInDialogProps) {
   const [mode, setMode] = useState<'append' | 'replace'>('append')
 
@@ -54,10 +56,28 @@ export function LockInDialog({
     (e) => e.selectedNormalBookies.length === 0 && e.selectedBetBackBookies.length === 0
   )
 
-  const handleConfirm = () => {
+  // Check for unselected races
+  const unselectedCount = totalSelectableCount - selectedEntries.length
+
+  const handleConfirm = useCallback(() => {
     onConfirm(mode)
     onClose()
-  }
+  }, [mode, onConfirm, onClose])
+
+  // Handle Enter key to submit
+  useEffect(() => {
+    if (!open) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleConfirm()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [open, handleConfirm])
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -82,6 +102,12 @@ export function LockInDialog({
           <Alert severity="info" sx={{ mb: 2 }}>
             {entriesWithoutBookies.length} race(s) have no bookie selections. You can add bet
             details in the tracker.
+          </Alert>
+        )}
+
+        {unselectedCount > 0 && (
+          <Alert severity="warning" sx={{ mb: 2 }} icon={<AlertTriangle size={18} />}>
+            {unselectedCount} race(s) are not selected and will not be locked in. Review the planner to ensure you haven't missed any races.
           </Alert>
         )}
 

@@ -43,13 +43,13 @@ import {
   type TrackedRaceEntry,
   type RaceResultData,
   type RaceOutcome,
-} from '@/modules/the-furlong'
+} from '@/modules/lay-manager'
 
-export const Route = createFileRoute('/dashboard/the-furlong/racing-tracker')({
-  component: RacingTrackerPage,
+export const Route = createFileRoute('/dashboard/non-promo')({
+  component: LayManagerPage,
 })
 
-function RacingTrackerPage() {
+function LayManagerPage() {
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(dayjs())
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -111,8 +111,8 @@ function RacingTrackerPage() {
     date: selectedDateStr,
     entries,
     enabled: pollingEnabled && entries.length > 0,
-    intervalMs: 90000, // 1.5 minutes
-    raceDelayMinutes: 2, // Wait 2 mins after race time before polling
+    intervalMs: 90000,
+    raceDelayMinutes: 2,
     onResultUpdate: handleResultUpdate,
     onError: handlePollingError,
   })
@@ -234,7 +234,7 @@ function RacingTrackerPage() {
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-        No Lay Race Manager
+        Lay Manager
       </Typography>
 
       {error && (

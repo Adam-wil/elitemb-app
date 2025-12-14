@@ -36,13 +36,13 @@ function isTrackName(value: unknown): boolean {
 }
 
 /**
- * Find the column index where track names start (columns A-F, indices 0-5)
+ * Find the column index where track names start (columns A-M, indices 0-12)
  */
 function findTrackColumn(worksheet: XLSX.WorkSheet, range: XLSX.Range): number {
-  console.log('findTrackColumn: searching for track names in first 10 rows, columns A-F')
-  // Search first 10 rows for track names in columns A-F
-  for (let row = range.s.r; row <= Math.min(range.e.r, 10); row++) {
-    for (let col = 0; col <= 5; col++) {
+  console.log('findTrackColumn: searching for track names in rows 1-25, columns A-M')
+  // Search rows 1-25 for track names in columns A-M (better coverage for pasted tables)
+  for (let row = range.s.r; row <= Math.min(range.e.r, 24); row++) {
+    for (let col = 0; col <= 12; col++) {
       const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
       const cell = worksheet[cellAddress]
       if (cell && cell.v) {
@@ -179,43 +179,117 @@ function findSectionColumns(worksheet: XLSX.WorkSheet, range: XLSX.Range): {
 
 /**
  * Try to extract date from filename
- * Handles formats like: PromoList6thDec25.xlsx, PromoList29thNov25.xlsx
+ * Handles multiple formats:
+ * - "6thDec25", "29thNov25" (day + ordinal + month + year)
+ * - "DEC13", "NOV29" (month + day)
+ * - "13Dec2025", "29Nov25" (day + month + year)
+ * - "Dec-13-2025", "Nov_29_25" (with separators)
+ * - "2025-12-13", "2025/12/13" (ISO format)
  */
 function extractDateFromFilename(filename: string): string | null {
   // Remove extension
-  const baseName = filename.replace(/\.[^/.]+$/, '')
+  const baseName = filename.replace(/\.[^/.]+$/, '').toUpperCase()
 
-  // Pattern: day + ordinal + month + year (e.g., 6thDec25, 29thNov25)
-  const datePattern = /(\d{1,2})(?:st|nd|rd|th)?[\s-]?([A-Za-z]{3,})[\s-]?(\d{2,4})/i
-  const match = baseName.match(datePattern)
+  const months: Record<string, string> = {
+    JAN: '01', JANUARY: '01',
+    FEB: '02', FEBRUARY: '02',
+    MAR: '03', MARCH: '03',
+    APR: '04', APRIL: '04',
+    MAY: '05',
+    JUN: '06', JUNE: '06',
+    JUL: '07', JULY: '07',
+    AUG: '08', AUGUST: '08',
+    SEP: '09', SEPTEMBER: '09',
+    OCT: '10', OCTOBER: '10',
+    NOV: '11', NOVEMBER: '11',
+    DEC: '12', DECEMBER: '12',
+  }
 
-  if (match) {
-    const day = match[1].padStart(2, '0')
-    const monthStr = match[2].toLowerCase()
-    const year = match[3].length === 2 ? `20${match[3]}` : match[3]
+  // Try multiple patterns in order of specificity
+  const patterns = [
+    // ISO format: 2025-12-13 or 2025/12/13
+    {
+      regex: /(\d{4})[\s\-_/](\d{1,2})[\s\-_/](\d{1,2})/,
+      extract: (m: RegExpMatchArray) => ({
+        year: m[1],
+        month: m[2].padStart(2, '0'),
+        day: m[3].padStart(2, '0'),
+      }),
+    },
+    // Day + ordinal + month + year: 6thDec25, 29thNov2025
+    {
+      regex: /(\d{1,2})(?:ST|ND|RD|TH)?[\s\-_]?([A-Z]{3,}?)[\s\-_]?(\d{2,4})/,
+      extract: (m: RegExpMatchArray) => {
+        const month = months[m[2].substring(0, 3)]
+        if (!month) return null
+        return {
+          day: m[1].padStart(2, '0'),
+          month,
+          year: m[3].length === 2 ? `20${m[3]}` : m[3],
+        }
+      },
+    },
+    // Month + day: DEC13, NOV29 (assumes current year or next occurrence)
+    {
+      regex: /([A-Z]{3,})(\d{1,2})(?!\d)/,
+      extract: (m: RegExpMatchArray) => {
+        // Try to find a month name in the letters
+        let month = null
+        const letters = m[1]
 
-    const months: Record<string, string> = {
-      jan: '01', january: '01',
-      feb: '02', february: '02',
-      mar: '03', march: '03',
-      apr: '04', april: '04',
-      may: '05',
-      jun: '06', june: '06',
-      jul: '07', july: '07',
-      aug: '08', august: '08',
-      sep: '09', september: '09',
-      oct: '10', october: '10',
-      nov: '11', november: '11',
-      dec: '12', december: '12',
-    }
+        // Check if the first 3 letters are a month
+        if (letters.length >= 3) {
+          month = months[letters.substring(0, 3)]
+        }
 
-    const month = months[monthStr.substring(0, 3)]
-    if (month) {
-      return `${year}-${month}-${day}`
+        // If not found, try checking the last 3 letters (e.g., "LISTDEC" -> "DEC")
+        if (!month && letters.length >= 3) {
+          month = months[letters.substring(letters.length - 3)]
+        }
+
+        if (!month) return null
+
+        // Use current year as default
+        const currentYear = new Date().getFullYear()
+        return {
+          day: m[2].padStart(2, '0'),
+          month,
+          year: currentYear.toString(),
+        }
+      },
+    },
+  ]
+
+  for (const pattern of patterns) {
+    const match = baseName.match(pattern.regex)
+    if (match) {
+      const parts = pattern.extract(match)
+      if (parts) {
+        const dateStr = `${parts.year}-${parts.month}-${parts.day}`
+        // Validate it's a real date
+        const date = new Date(dateStr)
+        if (!isNaN(date.getTime())) {
+          console.log(`Extracted date from filename "${filename}": ${dateStr}`)
+          return dateStr
+        }
+      }
     }
   }
 
+  console.log(`Could not extract date from filename "${filename}"`)
   return null
+}
+
+/**
+ * Get examples of supported date formats for user guidance
+ */
+export function getSupportedDateFormats(): string[] {
+  return [
+    '6thDec25 or 29thNov2025 (day + month + year)',
+    'DEC13 or NOV29 (month + day)',
+    '13Dec2025 or 29-Nov-25 (day-month-year)',
+    '2025-12-13 or 2025/12/13 (ISO format)',
+  ]
 }
 
 /**
@@ -495,7 +569,7 @@ export async function parseRacingPlanExcel(file: File, options?: ParseOptions): 
         const trackCol = findTrackColumn(worksheet, range)
 
         if (trackCol === -1) {
-          reject(new Error('Could not find track names in columns A-F'))
+          reject(new Error('Could not find track names in columns A-M, rows 1-25. Please ensure your racing plan contains valid track names.'))
           return
         }
 
@@ -561,7 +635,7 @@ export async function parseRacingPlanExcel(file: File, options?: ParseOptions): 
         // Find the first row that has a track name in the track column
         // This is the actual data start row (not based on header detection)
         let dataStartRow = 2 // Start searching from row 2 (0-indexed, so row 3 in Excel)
-        for (let row = 0; row <= 10; row++) {
+        for (let row = 0; row <= 24; row++) {
           const cell = worksheet[XLSX.utils.encode_cell({ r: row, c: trackCol })]
           if (cell && isTrackName(cell.v)) {
             dataStartRow = row

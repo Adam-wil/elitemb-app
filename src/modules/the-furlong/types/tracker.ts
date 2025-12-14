@@ -98,6 +98,9 @@ export interface TrackedRaceEntry {
   // Metadata
   lockedInAt: string                  // ISO timestamp when locked in
   updatedAt: string                   // ISO timestamp of last update
+
+  // Row state
+  readOnly?: boolean                  // If true, row is locked from editing
 }
 
 /**

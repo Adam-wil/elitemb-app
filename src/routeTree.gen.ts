@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardNonPromoRouteImport } from './routes/dashboard/non-promo'
 import { Route as DashboardTheFurlongRacingTrackerRouteImport } from './routes/dashboard/the-furlong/racing-tracker'
 import { Route as DashboardTheFurlongPlannerRouteImport } from './routes/dashboard/the-furlong/planner'
 
@@ -36,6 +37,11 @@ const DashboardIndexRoute = DashboardIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardNonPromoRoute = DashboardNonPromoRouteImport.update({
+  id: '/non-promo',
+  path: '/non-promo',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardTheFurlongRacingTrackerRoute =
   DashboardTheFurlongRacingTrackerRouteImport.update({
     id: '/the-furlong/racing-tracker',
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/non-promo': typeof DashboardNonPromoRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/the-furlong/planner': typeof DashboardTheFurlongPlannerRoute
   '/dashboard/the-furlong/racing-tracker': typeof DashboardTheFurlongRacingTrackerRoute
@@ -60,6 +67,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/dashboard/non-promo': typeof DashboardNonPromoRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/the-furlong/planner': typeof DashboardTheFurlongPlannerRoute
   '/dashboard/the-furlong/racing-tracker': typeof DashboardTheFurlongRacingTrackerRoute
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
   '/login': typeof LoginRoute
+  '/dashboard/non-promo': typeof DashboardNonPromoRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/the-furlong/planner': typeof DashboardTheFurlongPlannerRoute
   '/dashboard/the-furlong/racing-tracker': typeof DashboardTheFurlongRacingTrackerRoute
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/dashboard/non-promo'
     | '/dashboard/'
     | '/dashboard/the-furlong/planner'
     | '/dashboard/the-furlong/racing-tracker'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/dashboard/non-promo'
     | '/dashboard'
     | '/dashboard/the-furlong/planner'
     | '/dashboard/the-furlong/racing-tracker'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/dashboard/non-promo'
     | '/dashboard/'
     | '/dashboard/the-furlong/planner'
     | '/dashboard/the-furlong/racing-tracker'
@@ -135,6 +147,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/dashboard/non-promo': {
+      id: '/dashboard/non-promo'
+      path: '/non-promo'
+      fullPath: '/dashboard/non-promo'
+      preLoaderRoute: typeof DashboardNonPromoRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/dashboard/the-furlong/racing-tracker': {
       id: '/dashboard/the-furlong/racing-tracker'
       path: '/the-furlong/racing-tracker'
@@ -153,12 +172,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteRouteChildren {
+  DashboardNonPromoRoute: typeof DashboardNonPromoRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardTheFurlongPlannerRoute: typeof DashboardTheFurlongPlannerRoute
   DashboardTheFurlongRacingTrackerRoute: typeof DashboardTheFurlongRacingTrackerRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
+  DashboardNonPromoRoute: DashboardNonPromoRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardTheFurlongPlannerRoute: DashboardTheFurlongPlannerRoute,
   DashboardTheFurlongRacingTrackerRoute: DashboardTheFurlongRacingTrackerRoute,

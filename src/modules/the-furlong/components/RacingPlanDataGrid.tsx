@@ -139,27 +139,35 @@ export function RacingPlanDataGrid({
     switch (status) {
       case 'verified':
         return (
-          <Tooltip title="Time verified with API">
-            <CheckCircle size={16} color="#2e7d32" />
+          <Tooltip title="Time verified with API" arrow>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <CheckCircle size={20} color="#2e7d32" strokeWidth={2.5} />
+            </Box>
           </Tooltip>
         )
       case 'mismatch':
         return (
-          <Tooltip title="Time corrected from API">
-            <AlertTriangle size={16} color="#ed6c02" />
+          <Tooltip title="Time corrected from API (mismatch detected)" arrow>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <AlertTriangle size={20} color="#ed6c02" strokeWidth={2.5} />
+            </Box>
           </Tooltip>
         )
       case 'not_found':
         return (
-          <Tooltip title="Race not found in API">
-            <HelpCircle size={16} color="#9e9e9e" />
+          <Tooltip title="Race not found in API" arrow>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <HelpCircle size={20} color="#9e9e9e" strokeWidth={2.5} />
+            </Box>
           </Tooltip>
         )
       case 'pending':
       default:
         return (
-          <Tooltip title="Not yet validated">
-            <Clock size={16} color="#9e9e9e" />
+          <Tooltip title="Time validation pending" arrow>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <Clock size={20} color="#9e9e9e" strokeWidth={2} />
+            </Box>
           </Tooltip>
         )
     }
@@ -206,7 +214,7 @@ export function RacingPlanDataGrid({
     {
       field: 'time',
       headerName: 'Time',
-      width: 70,
+      width: 90,
       sortable: true,
       renderCell: (params: { value: string }) => (
         <Typography variant="body2" fontWeight={500} sx={{ fontSize: '0.8rem' }}>
@@ -293,8 +301,8 @@ export function RacingPlanDataGrid({
     {
       field: 'normalPromosByBookie',
       headerName: 'Normal Promos',
-      flex: 1,
-      minWidth: 280,
+      flex: 1.8,
+      minWidth: 500,
       sortable: false,
       renderCell: (params: { row: RacingPlanEntry; value: BookiePromo[] }) => {
         const promos = params.value || []
@@ -325,7 +333,7 @@ export function RacingPlanDataGrid({
       field: 'betBackPromosByBookie',
       headerName: 'Bet Back Options',
       flex: 1,
-      minWidth: 250,
+      minWidth: 280,
       sortable: false,
       renderCell: (params: { row: RacingPlanEntry; value: BookiePromo[] }) => {
         const promos = params.value || []
@@ -354,8 +362,8 @@ export function RacingPlanDataGrid({
     },
     {
       field: 'timeValidationStatus',
-      headerName: 'Valid',
-      width: 50,
+      headerName: 'Time Valid',
+      width: 80,
       sortable: true,
       disableColumnMenu: true,
       renderCell: (params: { row: RacingPlanEntry }) => (
@@ -366,15 +374,21 @@ export function RacingPlanDataGrid({
     },
   ]
 
+  // Calculate dynamic height based on number of rows
+  // Row height (42) × number of rows + header (56) + footer (52) + padding (20)
+  const calculatedHeight = (convertedEntries.length * 42) + 128
+  const tableHeight = Math.min(calculatedHeight, window.innerHeight - 200)
+  const minHeight = Math.min(400, calculatedHeight)
+
   return (
-    <Box sx={{ height: 'calc(100vh - 280px)', minHeight: 400, width: '100%' }}>
+    <Box sx={{ height: tableHeight, minHeight, width: '100%' }}>
       <DataGridComponent
         rows={convertedEntries}
         columns={columns}
-        pageSizeOptions={[10, 25, 50, 100]}
+        pageSizeOptions={[25, 50, 100]}
         rowHeight={42}
         initialState={{
-          pagination: { paginationModel: { pageSize: 25 } },
+          pagination: { paginationModel: { pageSize: 100 } },
           sorting: { sortModel: [{ field: 'time', sort: 'asc' }] },
         }}
         disableRowSelectionOnClick

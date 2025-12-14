@@ -81,8 +81,16 @@ export function BookieMatrix({
       sx={{
         display: 'flex',
         gap: 0.5,
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
         alignItems: 'center',
+        overflowX: 'auto',
+        '&::-webkit-scrollbar': {
+          height: 4,
+        },
+        '&::-webkit-scrollbar-thumb': {
+          backgroundColor: 'rgba(0,0,0,0.2)',
+          borderRadius: 2,
+        },
       }}
     >
       {availableBookies.map((bp) => {

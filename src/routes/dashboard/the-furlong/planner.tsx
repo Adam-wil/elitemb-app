@@ -21,8 +21,9 @@ import {
   ListItemText,
   Divider,
   Badge,
+  CircularProgress,
 } from '@mui/material'
-import { Archive, RotateCcw, Trash2, Lock } from 'lucide-react'
+import { Archive, RotateCcw, Trash2, Lock, HelpCircle } from 'lucide-react'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
   ImportButton,
@@ -31,7 +32,9 @@ import {
   TimezoneSelector,
   useTimezone,
   LockInDialog,
+  DEFAULT_STATE_COMMISSIONS,
   parseRacingPlanExcel,
+  getSupportedDateFormats,
   validateRaceTimes,
   archivePlan,
   getArchivedPlanByDate,
@@ -112,6 +115,11 @@ function PlannerPage() {
     return trackerData?.entries.length || 0
   }, [selectedDateStr])
 
+  // Get count of selectable entries (non-skipped races)
+  const totalSelectableCount = useMemo(() => {
+    return currentEntries.filter((e) => !e.skip).length
+  }, [currentEntries])
+
   // Clear selection when date changes
   useEffect(() => {
     setSelectedEntryIds([])
@@ -182,8 +190,8 @@ function PlannerPage() {
         return
       }
 
-      // Check if file date differs from selected calendar date
-      if (result.detectedDate && result.detectedDate !== selectedDateStr) {
+      // Check if file date differs from selected calendar date OR if no date could be detected
+      if (!result.detectedDate || result.detectedDate !== selectedDateStr) {
         setPendingImport(result)
         setDateMismatchDialog(true)
         setLoading(false)
@@ -339,7 +347,8 @@ function PlannerPage() {
   }
 
   const handleLockInConfirm = (mode: 'append' | 'replace') => {
-    lockInPlanEntries(selectedEntries, selectedDateStr, mode === 'append')
+    // Pass state commissions to auto-populate Comm% based on track location
+    lockInPlanEntries(selectedEntries, selectedDateStr, mode === 'append', DEFAULT_STATE_COMMISSIONS)
     setLockInDialogOpen(false)
     setSelectedEntryIds([])
     setSuccessMessage(`Locked in ${selectedEntries.length} race(s) to tracker`)
@@ -445,7 +454,7 @@ function PlannerPage() {
               </Box>
             </Box>
 
-            <Box sx={{ flexGrow: 1 }}>
+            <Box sx={{ flexGrow: 1, position: 'relative' }}>
               <RacingPlanDataGrid
                 entries={currentEntries}
                 selectedDate={selectedDateDisplay}
@@ -456,6 +465,32 @@ function PlannerPage() {
                 selectedIds={selectedEntryIds}
                 onSelectionChange={handleSelectionChange}
               />
+
+              {/* Loading Overlay */}
+              {(loading || validating) && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                    backdropFilter: 'blur(4px)',
+                    zIndex: 1000,
+                    borderRadius: 1,
+                  }}
+                >
+                  <CircularProgress size={48} thickness={4} sx={{ mb: 2 }} />
+                  <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 500 }}>
+                    {loading ? 'Importing racing plan...' : 'Validating race times...'}
+                  </Typography>
+                </Box>
+              )}
             </Box>
           </Paper>
         </Box>
@@ -463,23 +498,41 @@ function PlannerPage() {
 
       {/* Bet Back Column Validation Dialog */}
       <Dialog open={betBackColumnDialog} onClose={handleBetBackColumnCancel}>
-        <DialogTitle>Specify Bet Back Column</DialogTitle>
+        <DialogTitle>Which column has Bet Back Options?</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Could not automatically detect the "Bet Back Options" column header in the Excel file.
+            We couldn't find the "Bet Back Options" column automatically.
           </DialogContentText>
-          <DialogContentText sx={{ mt: 1 }}>
-            Please enter the column letter where the Bet Back Options section starts (e.g., "U"):
-          </DialogContentText>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+            <DialogContentText sx={{ fontWeight: 500, mb: 0 }}>
+              Please tell me which column the Bet Back Options start in:
+            </DialogContentText>
+            <Tooltip
+              title="Look at your Excel file and find the column letter (like U, V, or W) where 'Bet Back Options' begins."
+              arrow
+              placement="right"
+            >
+              <IconButton size="small" sx={{ color: 'primary.main' }}>
+                <HelpCircle size={18} />
+              </IconButton>
+            </Tooltip>
+          </Box>
           <TextField
             autoFocus
             margin="dense"
             label="Column Letter"
             value={betBackColumn}
-            onChange={(e) => setBetBackColumn(e.target.value.toUpperCase())}
+            onChange={(e) => setBetBackColumn(e.target.value.trim().toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && betBackColumn.match(/^[A-Z]{1,2}$/)) {
+                e.preventDefault()
+                handleBetBackColumnConfirm()
+              }
+            }}
             placeholder="U"
-            sx={{ mt: 2, width: 120 }}
-            inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
+            helperText="Examples: U, V, W, AA, AB"
+            sx={{ mt: 2, width: 160 }}
+            inputProps={{ maxLength: 3, style: { textTransform: 'uppercase' } }}
           />
         </DialogContent>
         <DialogActions>
@@ -500,14 +553,35 @@ function PlannerPage() {
       <Dialog open={dateMismatchDialog} onClose={handleCancelImport}>
         <DialogTitle>Date Mismatch Detected</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            The file <strong>{pendingImport?.fileName}</strong> appears to be for{' '}
-            <strong>{pendingImport?.detectedDate ? formatDetectedDate(pendingImport.detectedDate) : 'unknown date'}</strong>,
-            but you have selected <strong>{selectedDateDisplay}</strong> on the calendar.
-          </DialogContentText>
-          <DialogContentText sx={{ mt: 2 }}>
-            Do you want to import this data to the selected calendar date ({selectedDateDisplay})?
-          </DialogContentText>
+          {pendingImport?.detectedDate ? (
+            <>
+              <DialogContentText>
+                The file <strong>{pendingImport?.fileName}</strong> appears to be for{' '}
+                <strong>{formatDetectedDate(pendingImport.detectedDate)}</strong>,
+                but you have selected <strong>{selectedDateDisplay}</strong> on the calendar.
+              </DialogContentText>
+              <DialogContentText sx={{ mt: 2 }}>
+                Do you want to import this data to the selected calendar date ({selectedDateDisplay})?
+              </DialogContentText>
+            </>
+          ) : (
+            <>
+              <DialogContentText>
+                Could not detect a date from the filename <strong>{pendingImport?.fileName}</strong>.
+              </DialogContentText>
+              <DialogContentText sx={{ mt: 2 }}>
+                <strong>Supported filename formats:</strong>
+              </DialogContentText>
+              <DialogContentText component="div" sx={{ mt: 1, pl: 2 }}>
+                {getSupportedDateFormats().map((format, idx) => (
+                  <div key={idx}>• {format}</div>
+                ))}
+              </DialogContentText>
+              <DialogContentText sx={{ mt: 2 }}>
+                Do you want to import this file to the selected calendar date ({selectedDateDisplay})?
+              </DialogContentText>
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelImport} color="inherit">
@@ -584,6 +658,7 @@ function PlannerPage() {
         date={selectedDateStr}
         dateDisplay={selectedDateDisplay}
         existingTrackerCount={existingTrackerCount}
+        totalSelectableCount={totalSelectableCount}
       />
 
       <Snackbar
@@ -591,13 +666,6 @@ function PlannerPage() {
         autoHideDuration={5000}
         onClose={() => setSuccess(false)}
         message={successMessage || `Successfully imported ${currentEntries.length} entries for ${selectedDateDisplay}`}
-      />
-
-      {/* Validating overlay */}
-      <Snackbar
-        open={validating}
-        message="Validating race times against PuntingForm API..."
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
     </Box>
   )
