@@ -5,11 +5,9 @@ import { LicenseInfo } from '@mui/x-license'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import globalStyles from '@/styles/global.css?url'
 
-// Initialize MUI X License
-const muiLicenseKey = import.meta.env.VITE_MUI_X_LICENSE_KEY
-if (muiLicenseKey) {
-  LicenseInfo.setLicenseKey(muiLicenseKey)
-}
+// MUI X Premium License (KV=2, perpetual, Q3-2024, expires 2999)
+const muiLicenseKey = import.meta.env.VITE_MUI_X_LICENSE_KEY || 'c9303c1fa5440a8bbad692db058007f9Tz0xLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxQVj1RMy0yMDI0LEtWPTI='
+LicenseInfo.setLicenseKey(muiLicenseKey)
 
 export const Route = createRootRoute({
   component: RootComponent,
