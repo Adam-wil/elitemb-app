@@ -88,32 +88,34 @@ The frontend SHALL use Tailwind CSS for styling with proper configuration and bu
 - **THEN** styles SHALL apply correctly
 - **AND** design system SHALL remain consistent
 
-### Requirement: Zustand State Management
-The frontend SHALL use Zustand for lightweight, hook-based state management with clear store organization.
+### Requirement: Redux Toolkit State Management
+The frontend SHALL use Redux Toolkit for centralized, type-safe state management with Redux DevTools integration.
 
-#### Scenario: State store setup
-- **WHEN** global state is needed
-- **THEN** Zustand stores SHALL be created in src/store directory
-- **AND** stores SHALL use TypeScript for type safety
-
-#### Scenario: State consumption
-- **WHEN** components need global state
-- **THEN** they SHALL use Zustand hooks to access state
-- **AND** state updates SHALL trigger component re-renders
-
-### Requirement: React Query Infrastructure
-The frontend SHALL include TanStack Query (@tanstack/react-query) setup with QueryClient configuration but without implemented API calls initially.
-
-#### Scenario: Query client setup
+#### Scenario: Redux store setup
 - **WHEN** the application initializes
-- **THEN** QueryClientProvider SHALL wrap the app
-- **AND** QueryClient SHALL be configured with default options
-- **AND** React Query DevTools SHALL be available in development
+- **THEN** Redux store SHALL be configured using configureStore from @reduxjs/toolkit
+- **AND** the store SHALL be organized in src/store directory
+- **AND** Redux Provider SHALL wrap the app in App.tsx
+- **AND** Redux DevTools extension SHALL be enabled
 
-#### Scenario: Query hooks structure
-- **WHEN** API integration is needed in the future
-- **THEN** query hooks SHALL be organized in src/hooks/queries directory
-- **AND** mutations and queries SHALL follow consistent patterns
+#### Scenario: State slices organization
+- **WHEN** features need state management
+- **THEN** slices SHALL be created using createSlice from Redux Toolkit
+- **AND** core feature slices SHALL reside in src/store/slices (dashboardSlice, bankingSlice, profilesSlice)
+- **AND** furlong feature slices SHALL reside in src/store/slices/furlong (trackerSlice, plannerSlice, promoTrackerSlice)
+- **AND** all slices SHALL use TypeScript for type safety
+
+#### Scenario: Typed Redux hooks
+- **WHEN** components need to access Redux state or dispatch actions
+- **THEN** they SHALL use typed useAppSelector and useAppDispatch hooks from src/store/hooks.ts
+- **AND** TypeScript SHALL provide autocompletion and type checking for state and actions
+
+#### Scenario: State consumption and updates
+- **WHEN** components need global state
+- **THEN** they SHALL use useAppSelector to read state
+- **AND** they SHALL use useAppDispatch to dispatch actions
+- **AND** state updates SHALL trigger component re-renders
+- **AND** Redux DevTools SHALL allow time-travel debugging
 
 ### Requirement: Handsontable Data Grid Integration
 The frontend SHALL include Handsontable with @handsontable/react for spreadsheet-like data grid functionality with Excel-like editing capabilities, primarily for the furlong tracker table.

@@ -11,10 +11,10 @@ The project follows a frontend-first development approach to validate UX and req
 - Establish type-safe React development with TypeScript 5+
 - Create scalable modular architecture separating core and module-specific features
 - Enable fast development iteration with Vite and hot module replacement
-- Provide Excel-like data editing capabilities for furlong tracker
-- Set up modern state management and data fetching patterns
+- Provide Excel-like data editing capabilities for furlong tracker with Handsontable
+- Set up centralized state management with Redux Toolkit
 - Enforce code quality through automated linting and formatting
-- Support future backend integration through React Query infrastructure
+- Support future backend integration through structured state management
 
 ### Non-Goals
 - Backend API implementation (deferred to future change)
@@ -81,27 +81,39 @@ The project follows a frontend-first development approach to validate UX and req
 - ✅ Mature, well-documented, actively maintained
 - ⚠️ Note: Verify license compliance for commercial use
 
-### Decision 4: Zustand for State Management
-**Rationale:** Zustand provides simple, hook-based state management with minimal boilerplate. Perfect for app-level state without Redux complexity.
+### Decision 4: Redux Toolkit for State Management
+**Rationale:** Redux Toolkit provides centralized, predictable state management with excellent TypeScript support and powerful dev tools. Perfect for managing complex application state across core and furlong features.
 
 **Alternatives considered:**
-- Redux Toolkit: Too much boilerplate for this project's needs
-- Jotai/Recoil: Atomic state - unnecessary complexity
-- Context API only: Works but lacks dev tools and optimizations
+- Zustand: Too minimal for complex state interactions across features
+- Jotai/Recoil: Atomic state - learning curve without clear benefits
+- Context API only: Works but lacks dev tools, performance optimizations, and middleware
 
-**Winner:** Zustand - simplest API, great TypeScript support, tiny bundle size
+**Winner:** Redux Toolkit
+- ✅ Industry-standard state management with proven patterns
+- ✅ Excellent TypeScript integration with type-safe actions and reducers
+- ✅ Powerful Redux DevTools for debugging state changes
+- ✅ Built-in middleware support (thunks for async actions)
+- ✅ RTK Query available if needed for future API integration
+- ✅ Simplified Redux setup with createSlice and configureStore
+- ✅ Immer integration for immutable state updates with mutable-looking code
 
-### Decision 5: TanStack Query (React Query) for Server State
-**Rationale:** Separates server state from client state. Provides caching, background refetching, and excellent developer experience. Setting up infrastructure now makes future backend integration seamless.
+**State Organization:**
+```
+src/store/
+├── index.ts                 # Store configuration
+├── slices/
+│   ├── dashboardSlice.ts   # Dashboard state
+│   ├── bankingSlice.ts     # Banking state
+│   ├── profilesSlice.ts    # Profiles state
+│   └── furlong/
+│       ├── trackerSlice.ts      # Tracker state
+│       ├── plannerSlice.ts      # Planner state
+│       └── promoTrackerSlice.ts # Promo tracker state
+└── hooks.ts                # Typed useAppDispatch and useAppSelector
+```
 
-**Benefits:**
-- Automatic request deduplication
-- Background data synchronization
-- Optimistic updates support
-- Built-in dev tools
-- Excellent TypeScript integration
-
-### Decision 6: Tailwind CSS for Styling
+### Decision 5: Tailwind CSS for Styling
 **Rationale:** Utility-first CSS that works perfectly with component-based React. Maintains design consistency and produces small production bundles.
 
 **Alternatives considered:**
@@ -111,7 +123,7 @@ The project follows a frontend-first development approach to validate UX and req
 
 **Winner:** Tailwind - fastest development, smallest bundle, most flexible
 
-### Decision 7: Path Aliases (@/)
+### Decision 6: Path Aliases (@/)
 **Rationale:** Using @/components instead of ../../../components improves code readability and makes refactoring easier when moving files.
 
 **Configuration:**
@@ -119,7 +131,7 @@ The project follows a frontend-first development approach to validate UX and req
 - Vite: vite.config.ts resolve.alias
 - Single @ prefix for src/ directory
 
-### Decision 8: React Router v6 for Routing
+### Decision 7: React Router v6 for Routing
 **Rationale:** Industry standard for React SPA routing. v6 provides improved TypeScript support and smaller bundle size than v5.
 
 **Route Structure:**
@@ -153,9 +165,10 @@ The project follows a frontend-first development approach to validate UX and req
 - ❌ Temptation to hardcode data instead of proper API integration
 
 **Mitigation:**
-- Set up React Query infrastructure from day one
+- Set up Redux slices with proper state structure from day one
 - Use TypeScript interfaces for data shapes (future API contracts)
-- Mock API responses in hooks to simulate real backend
+- Design Redux actions and reducers to accommodate future async thunks for API calls
+- Keep state management separate from UI components for easier backend integration
 
 ### Risk: Modular Structure Learning Curve
 **Trade-off:**
@@ -168,15 +181,18 @@ The project follows a frontend-first development approach to validate UX and req
 - Provide examples of each feature type
 - Code review to enforce conventions
 
-### Risk: Zustand + React Query Overlap
+### Risk: Redux Boilerplate vs Complexity Trade-off
 **Trade-off:**
-Both handle state, could cause confusion about which to use.
+- ✅ Redux Toolkit significantly reduces boilerplate compared to classic Redux
+- ✅ Centralized state makes debugging and state flow easier
+- ❌ More setup than minimal solutions like Zustand
+- ❌ Learning curve for developers unfamiliar with Redux patterns
 
-**Clear boundaries:**
-- **Zustand:** UI state, user preferences, app-level client state
-- **React Query:** Server data, API responses, cached backend data
-
-**Mitigation:** Document usage patterns clearly in design docs
+**Mitigation:**
+- Use Redux Toolkit's modern APIs (createSlice, configureStore)
+- Create clear examples and templates for common patterns
+- Document slice organization and best practices
+- Leverage TypeScript for type-safe state access
 
 ## Migration Plan
 
@@ -184,25 +200,25 @@ Both handle state, could cause confusion about which to use.
 1. ✅ Initialize Vite + React + TypeScript
 2. ✅ Configure tooling (ESLint, Prettier, Tailwind)
 3. ✅ Create folder structure
-4. ✅ Set up routing, state management, React Query
+4. ✅ Set up routing and Redux Toolkit state management
 5. ✅ Integrate Handsontable
 6. ✅ Create placeholder pages/components
 7. ✅ Verify dev environment works end-to-end
 
 ### Phase 2: Feature Development (Future Changes)
-- Implement dashboard UI
-- Implement banking UI
-- Implement profiles UI
-- Build furlong tracker with Handsontable
-- Build furlong planner
-- Build promo tracker
+- Implement dashboard UI with Redux state
+- Implement banking UI with Redux state
+- Implement profiles UI with Redux state
+- Build furlong tracker with Handsontable and Redux integration
+- Build furlong planner with Redux state
+- Build promo tracker with Redux state
 
 ### Phase 3: Backend Integration (Future Changes)
 - Develop backend API
-- Replace mocked React Query hooks with real API calls
-- Add authentication
-- Connect Handsontable to backend data
-- Add data persistence
+- Add async thunks for API calls in Redux slices
+- Add authentication with Redux state management
+- Connect Handsontable to backend data via Redux
+- Add data persistence with Redux middleware
 
 ### Rollback
 If this foundation needs to be rolled back:

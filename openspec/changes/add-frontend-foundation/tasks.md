@@ -9,8 +9,8 @@
 ## 2. Core Dependencies Installation
 - [ ] 2.1 Install React Router v6 (react-router-dom)
 - [ ] 2.2 Install Tailwind CSS with PostCSS and Autoprefixer
-- [ ] 2.3 Install Zustand for state management
-- [ ] 2.4 Install TanStack Query (@tanstack/react-query)
+- [ ] 2.3 Install Redux Toolkit (@reduxjs/toolkit)
+- [ ] 2.4 Install React-Redux (react-redux)
 - [ ] 2.5 Install Handsontable and @handsontable/react
 - [ ] 2.6 Install type definitions (@types/node for path aliases)
 
@@ -61,59 +61,61 @@
 - [ ] 8.4 Set up route structure for furlong module
 - [ ] 8.5 Add Router provider in App.tsx
 
-## 9. State Management Setup
+## 9. Redux Toolkit Setup
 - [ ] 9.1 Create src/store directory
-- [ ] 9.2 Create initial Zustand store structure
-- [ ] 9.3 Add example store slices for reference
+- [ ] 9.2 Create store/index.ts with configureStore
+- [ ] 9.3 Create store/hooks.ts with typed useAppDispatch and useAppSelector
+- [ ] 9.4 Create store/slices directory
+- [ ] 9.5 Create example slices (dashboardSlice.ts, bankingSlice.ts, profilesSlice.ts)
+- [ ] 9.6 Create store/slices/furlong directory
+- [ ] 9.7 Create furlong slices (trackerSlice.ts, plannerSlice.ts, promoTrackerSlice.ts)
+- [ ] 9.8 Add Redux Provider in App.tsx
+- [ ] 9.9 Configure Redux DevTools integration
 
-## 10. React Query Setup
-- [ ] 10.1 Create src/lib/react-query.ts configuration
-- [ ] 10.2 Set up QueryClient with default options
-- [ ] 10.3 Add QueryClientProvider in App.tsx
-- [ ] 10.4 Create src/hooks/queries directory for future API hooks
+## 10. Handsontable Integration
+- [ ] 10.1 Import Handsontable CSS in main entry file
+- [ ] 10.2 Create basic Handsontable wrapper component example
+- [ ] 10.3 Configure Handsontable TypeScript types
+- [ ] 10.4 Verify Handsontable renders correctly
 
-## 11. Handsontable Integration
-- [ ] 11.1 Import Handsontable CSS in main entry file
-- [ ] 11.2 Create basic Handsontable wrapper component example
-- [ ] 11.3 Configure Handsontable TypeScript types
-- [ ] 11.4 Verify Handsontable renders correctly
+## 11. Environment Configuration
+- [ ] 11.1 Create .env.example with placeholder variables
+- [ ] 11.2 Add .env to .gitignore
+- [ ] 11.3 Document environment variables in .env.example
 
-## 12. Environment Configuration
-- [ ] 12.1 Create .env.example with placeholder variables
-- [ ] 12.2 Add .env to .gitignore
-- [ ] 12.3 Document environment variables in .env.example
+## 12. App Structure
+- [ ] 12.1 Update App.tsx with Router and Redux providers
+- [ ] 12.2 Create basic layout component
+- [ ] 12.3 Create placeholder pages for core features
+- [ ] 12.4 Create placeholder pages for furlong module
 
-## 13. App Structure
-- [ ] 13.1 Update App.tsx with Router and Query providers
-- [ ] 13.2 Create basic layout component
-- [ ] 13.3 Create placeholder pages for core features
-- [ ] 13.4 Create placeholder pages for furlong module
+## 13. Package Scripts
+- [ ] 13.1 Add dev script
+- [ ] 13.2 Add build script
+- [ ] 13.3 Add preview script
+- [ ] 13.4 Add lint script
+- [ ] 13.5 Add format script
+- [ ] 13.6 Add type-check script
 
-## 14. Package Scripts
-- [ ] 14.1 Add dev script
-- [ ] 14.2 Add build script
-- [ ] 14.3 Add preview script
-- [ ] 14.4 Add lint script
-- [ ] 14.5 Add format script
-- [ ] 14.6 Add type-check script
+## 14. Backend Placeholder
+- [ ] 14.1 Create 02_Backend directory
+- [ ] 14.2 Create README.md noting future implementation
 
-## 15. Backend Placeholder
-- [ ] 15.1 Create 02_Backend directory
-- [ ] 15.2 Create README.md noting future implementation
+## 15. Documentation
+- [ ] 15.1 Create 01_Frontend/README.md with setup instructions
+- [ ] 15.2 Document folder structure conventions
+- [ ] 15.3 Document path alias usage
+- [ ] 15.4 Document Redux state management patterns and best practices
 
-## 16. Documentation
-- [ ] 16.1 Create 01_Frontend/README.md with setup instructions
-- [ ] 16.2 Document folder structure conventions
-- [ ] 16.3 Document path alias usage
-- [ ] 16.4 Document state management patterns
-
-## 17. Verification
-- [ ] 17.1 Run npm run dev and verify server starts
-- [ ] 17.2 Verify hot module replacement works
-- [ ] 17.3 Run npm run build and verify production build succeeds
-- [ ] 17.4 Run npm run lint and ensure no errors
-- [ ] 17.5 Run npm run format and verify code formatting
-- [ ] 17.6 Verify TypeScript compilation with no errors
-- [ ] 17.7 Test routing navigation works
-- [ ] 17.8 Verify Tailwind styles apply correctly
-- [ ] 17.9 Verify Handsontable component renders
+## 16. Verification
+- [ ] 16.1 Run npm run dev and verify server starts
+- [ ] 16.2 Verify hot module replacement works
+- [ ] 16.3 Run npm run build and verify production build succeeds
+- [ ] 16.4 Run npm run lint and ensure no errors
+- [ ] 16.5 Run npm run format and verify code formatting
+- [ ] 16.6 Verify TypeScript compilation with no errors
+- [ ] 16.7 Test routing navigation works
+- [ ] 16.8 Verify Tailwind styles apply correctly
+- [ ] 16.9 Verify Handsontable component renders
+- [ ] 16.10 Verify Redux DevTools extension works
+- [ ] 16.11 Test Redux state updates trigger component re-renders
