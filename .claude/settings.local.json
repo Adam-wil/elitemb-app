@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "WebSearch",
+      "WebFetch(domain:tanstack.com)",
+      "Bash(powershell -Command \"Get-Content ''c:\\Users\\adam\\OneDrive\\Documents\\00_MB_Application\\00_Elite_MB_Application\\__Platinum Squad Bookie List by The System - Last updated 14_11_25 - Google Drive - new.html'' | Select-Object -First 100\")",
+      "Bash(node:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

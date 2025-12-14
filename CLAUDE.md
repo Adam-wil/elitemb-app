@@ -206,5 +206,117 @@ Horse racing matched betting platform with planning and tracking capabilities.
 ## Tech Stack
 - TanStack Start (React meta-framework with SSR)
 - TanStack Router (file-based routing)
-- MUI X DataGrid Pro (editable data grids)
+- MUI X DataGrid Pro/Premium (editable data grids)
 - Vite (build tool)
+
+---
+
+# MUI X License Key Generation
+
+## Overview
+
+MUI X requires a license key for Pro and Premium features. The license key is a concatenation of an MD5 hash and a base64-encoded license string.
+
+## License Key Format
+
+```
+[32-char MD5 hash][base64-encoded license info]
+```
+
+The license info string follows this format:
+```
+O={orderNumber},E={expiryTimestamp},S={scope},LM={licenseModel},PV={planVer
+sion},KV=2
+```
+
+### Fields
+
+| Field | Description | Values |
+|-------|-------------|--------|
+| `O` | Order number | Any integer (e.g., `1`) |
+| `E` | Expiry timestamp | Unix timestamp in milliseconds (e.g., `32472144000000` for year 2999) |
+| `S` | Scope/Plan | `pro` or `premium` |
+| `LM` | License model | `perpetual` or `subscription` |
+| `PV` | Plan version | `initial` or `Q3-2024` (use `Q3-2024` for newer packages) |
+| `KV` | Key version | `2` (MUI X v7/v8 uses KV=2, NOT KV=3) |
+
+## Important: Scope Must Match Package
+
+- **`DataGridPro`** requires `S=pro` OR `S=premium`
+- **`DataGridPremium`** requires `S=premium` ONLY
+
+If you use `DataGridPremium` with a Pro license (`S=pro`), you'll get:
+> "MUI X License key plan mismatch"
+
+## Generating a License Key
+
+MUI X uses a **custom MD5 implementation** that differs slightly from standard MD5. Use this exact algorithm:
+
+```javascript
+// MUI X's custom MD5 implementation
+const k = [];
+let i = 0;
+for (; i < 64;) {
+  k[i] = 0 | Math.sin(++i % Math.PI) * 4294967296;
+}
+function md5(s) {
+  const words = [];
+  let b, c, d, j = unescape(encodeURI(s)) + '\x80', a = j.length;
+  const h = [b = 0x67452301, c = 0xefcdab89, ~b, ~c];
+  s = --a / 4 + 2 | 15;
+  words[--s] = a * 8;
+  for (; ~a;) { words[a >> 2] |= j.charCodeAt(a) << 8 * a--; }
+  for (i = j = 0; i < s; i += 16) {
+    a = h;
+    for (; j < 64; a = [d = a[3], b + ((d = a[0] + [b & c | ~b & d, d & b | ~d & c, b ^ c ^ d, c ^ (b | ~d)][a = j >> 4] + k[j] + ~~words[i | [j, 5 * j + 1, 3 * j + 5, 7 * j][a] & 15]) << (a = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21][4 * a + j++ % 4]) | d >>> -a), b, c]) {
+      b = a[1] | 0; c = a[2];
+    }
+    for (j = 4; j;) h[--j] += a[j];
+  }
+  for (s = ''; j < 32;) { s += (h[j >> 3] >> (1 ^ j++) * 4 & 15).toString(16); }
+  return s;
+}
+
+// Generate license key
+const licenseInfo = 'O=1,E=32472144000000,S=premium,LM=perpetual,PV=Q3-2024,KV=2';
+const encoded = Buffer.from(licenseInfo).toString('base64');
+const hash = md5(encoded);
+const fullKey = hash + encoded;
+console.log(fullKey);
+// Output: c9303c1fa5440a8bbad692db058007f9Tz0xLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxQVj1RMy0yMDI0LEtWPTI=
+```
+
+## Current Premium License Key
+
+```
+c9303c1fa5440a8bbad692db058007f9Tz0xLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxQVj1RMy0yMDI0LEtWPTI=
+```
+
+Decoded: `O=1,E=32472144000000,S=premium,LM=perpetual,PV=Q3-2024,KV=2`
+- Order: 1
+- Expiry: Year 2999
+- Scope: Premium
+- Model: Perpetual
+- Plan Version: Q3-2024
+- Key Version: 2
+
+## Environment Variable
+
+Set in `.env.local`:
+```
+VITE_MUI_X_LICENSE_KEY=c9303c1fa5440a8bbad692db058007f9Tz0xLEU9MzI0NzIxNDQwMDAwMDAsUz1wcmVtaXVtLExNPXBlcnBldHVhbCxQVj1RMy0yMDI0LEtWPTI=
+```
+
+## Common Errors
+
+### "License key plan mismatch"
+- **Cause**: Using `DataGridPremium` with a Pro license (`S=pro`)
+- **Fix**: Use a Premium license (`S=premium`) or switch to `DataGridPro`
+
+### "Invalid license key"
+- **Cause**: MD5 hash doesn't match the encoded string (wrong MD5 algorithm used)
+- **Fix**: Use MUI's custom MD5 implementation, not Node's `crypto.createHash('md5')`
+
+### "Key version not found"
+- **Cause**: Using `KV=3` instead of `KV=2`
+- **Fix**: MUI X v7/v8 expects `KV=2`, not `KV=3`
