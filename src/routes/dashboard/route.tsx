@@ -20,7 +20,6 @@ import {
 import {
   Dashboard as DashboardIcon,
   AccountBalance as AccountBalanceIcon,
-  Receipt as ReceiptIcon,
   Settings as SettingsIcon,
   Menu as MenuIcon,
   ExpandLess,
@@ -47,13 +46,13 @@ const navItems: NavItem[] = [
     text: 'The Furlong',
     icon: <CircleStar size={24} />,
     children: [
+      { text: 'Racing Dashboard', path: '/dashboard/the-furlong/racing-dashboard', icon: <DashboardIcon /> },
       { text: 'Planner', path: '/dashboard/the-furlong/planner', icon: <CalendarDays size={20} /> },
       { text: 'Racing Manager', path: '/dashboard/the-furlong/racing-tracker', icon: <TimelineIcon /> },
       { text: 'Lay Manager', path: '/dashboard/non-promo', icon: <TableChartIcon /> },
     ],
   },
   { text: 'Accounts', icon: <AccountBalanceIcon />, path: '/dashboard/accounts' },
-  { text: 'Bets', icon: <ReceiptIcon />, path: '/dashboard/bets' },
   { text: 'Settings', icon: <SettingsIcon />, path: '/dashboard/settings' },
 ]
 
