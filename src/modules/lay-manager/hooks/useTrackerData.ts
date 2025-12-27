@@ -17,6 +17,7 @@ import {
   getDatesWithTrackerData,
 } from '../utils/trackerStorage'
 import { calculateProfitLoss } from '../utils/outcomeLogic'
+import { markBonusAsTurnedOver, getBonusById } from '@/modules/the-stable'
 
 interface UseTrackerDataOptions {
   date: string
@@ -102,15 +103,37 @@ export function useTrackerData({ date }: UseTrackerDataOptions): UseTrackerDataR
 
   /**
    * Update an entry
+   * Also marks linked bonus as turned over when outcome changes to a final state
    */
   const updateEntry = useCallback(
     (entryId: string, updates: Partial<TrackedRaceEntry>) => {
+      // Check if we need to mark a bonus as turned over
+      if (updates.outcome && data) {
+        const entry = data.entries.find((e) => e.id === entryId)
+        if (entry && entry.linkedBonusId) {
+          const isFinalOutcome = updates.outcome !== 'Pending'
+          const wasNotFinal = entry.outcome === 'Pending'
+
+          if (isFinalOutcome && wasNotFinal) {
+            // Check if bonus still exists and is pending
+            const bonus = getBonusById(entry.linkedBonusId)
+            if (bonus && bonus.status === 'pending') {
+              // Mark the bonus as turned over with the P/L
+              const entryWithOutcome = { ...entry, ...updates }
+              const profitLoss = calculateProfitLoss(entryWithOutcome as TrackedRaceEntry)
+              markBonusAsTurnedOver(entry.linkedBonusId, profitLoss)
+              console.log(`[LayManager] Marked bonus ${entry.linkedBonusId} as turned over with P/L: $${profitLoss}`)
+            }
+          }
+        }
+      }
+
       const updated = updateTrackerEntry(date, entryId, updates)
       if (updated) {
         setData(updated)
       }
     },
-    [date]
+    [date, data]
   )
 
   /**
@@ -128,6 +151,7 @@ export function useTrackerData({ date }: UseTrackerDataOptions): UseTrackerDataR
 
   /**
    * Update result and outcome for an entry
+   * Also marks linked bonus as turned over when outcome is set
    */
   const updateResult = useCallback(
     (entryId: string, result: RaceResultData, outcome: RaceOutcome) => {
@@ -146,6 +170,15 @@ export function useTrackerData({ date }: UseTrackerDataOptions): UseTrackerDataR
       // Recalculate P/L
       const entryWithOutcome = { ...entry, ...updatedEntry }
       updatedEntry.profitLoss = calculateProfitLoss(entryWithOutcome as TrackedRaceEntry)
+
+      // Mark linked bonus as turned over when race completes
+      if (entry.linkedBonusId && entry.outcome === 'Pending' && outcome !== 'Pending') {
+        const bonus = getBonusById(entry.linkedBonusId)
+        if (bonus && bonus.status === 'pending') {
+          markBonusAsTurnedOver(entry.linkedBonusId, updatedEntry.profitLoss)
+          console.log(`[LayManager] Marked bonus ${entry.linkedBonusId} as turned over (via polling) with P/L: $${updatedEntry.profitLoss}`)
+        }
+      }
 
       updateEntry(entryId, updatedEntry)
     },

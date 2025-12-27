@@ -69,6 +69,7 @@ export interface TrackedRaceEntry {
   lockedInAt: string
   updatedAt: string
   readOnly?: boolean
+  linkedBonusId?: string // Link to bonus in The Stable for turnover tracking
 }
 
 export interface TrackerSummary {
