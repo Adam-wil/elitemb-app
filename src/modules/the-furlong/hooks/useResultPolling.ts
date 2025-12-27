@@ -112,9 +112,10 @@ export function useResultPolling({
             outcome = determineOutcome(
               entry.selectionName || '',
               entry.selectionNumber,
-              result
+              result,
+              entry.promoType || 'none'
             )
-            console.log(`[Polling] Determined outcome: ${outcome} (selection #${entry.selectionNumber} vs winner #${result.winnerNumber})`)
+            console.log(`[Polling] Determined outcome: ${outcome} (selection #${entry.selectionNumber}, promo: ${entry.promoType || 'none'})`)
           } else {
             console.log(`[Polling] No selection number, keeping outcome as: ${outcome}`)
           }
@@ -154,7 +155,12 @@ export function useResultPolling({
           // Determine outcome if user has made a selection
           let outcome: RaceOutcome = 'Pending'
           if (entry.selectionName && entry.selectionNumber) {
-            outcome = determineOutcome(entry.selectionName, entry.selectionNumber, result)
+            outcome = determineOutcome(
+              entry.selectionName,
+              entry.selectionNumber,
+              result,
+              entry.promoType || 'none'
+            )
           }
 
           onResultUpdate(entry.id, result, outcome)

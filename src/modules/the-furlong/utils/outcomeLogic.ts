@@ -1,43 +1,84 @@
-import type { RaceOutcome, RaceResultData, TrackedRaceEntry, BetSide } from '../types'
+import type { RaceOutcome, RaceResultData, TrackedRaceEntry, BetSide, PromoType } from '../types'
+import { PROMO_TYPE_CONFIG } from '../types'
+
+/**
+ * Get the placement position of a selection in the race result
+ */
+function getSelectionPlacement(
+  selectionNumber: number,
+  result: RaceResultData
+): { position: number | null; deadHeat: boolean } {
+  if (result.places.first?.number === selectionNumber) {
+    return { position: 1, deadHeat: result.places.first.deadHeat || false }
+  }
+  if (result.places.second?.number === selectionNumber) {
+    return { position: 2, deadHeat: result.places.second.deadHeat || false }
+  }
+  if (result.places.third?.number === selectionNumber) {
+    return { position: 3, deadHeat: result.places.third.deadHeat || false }
+  }
+  return { position: null, deadHeat: false }
+}
 
 /**
  * Determine outcome by comparing user selection with API result
  * Primary validation: selection number (hard to mess up)
  * Secondary validation: selection name (as confirmation)
+ * Promo-aware: checks 2nd/3rd place for bonus eligibility based on promo type
  */
 export function determineOutcome(
   selectionName: string,
   selectionNumber: number,
-  result: RaceResultData
+  result: RaceResultData,
+  promoType: PromoType = 'none'
 ): RaceOutcome {
   // Check if horse was scratched first
   if (result.scratched.includes(selectionNumber)) {
     return 'Scratched'
   }
 
-  // Check for dead heat (if our selection was part of dead heat)
-  if (result.deadHeat && result.winnerNumber === selectionNumber) {
+  // Get placement using the new places structure
+  const placement = getSelectionPlacement(selectionNumber, result)
+
+  // Check for dead heat at selection's position
+  if (placement.position && placement.deadHeat) {
     return 'Dead Heat'
   }
 
-  // Primary check: Compare selection NUMBER with winner number
-  // This is the most reliable as numbers are hard to mess up
-  const numberMatches = result.winnerNumber === selectionNumber
-
-  if (numberMatches) {
+  // 1st place is always a win
+  if (placement.position === 1) {
     // Double-check with name if provided (optional confirmation)
-    if (selectionName) {
-      const nameMatches = normalizeHorseName(result.winnerName) === normalizeHorseName(selectionName)
+    if (selectionName && result.places.first) {
+      const nameMatches =
+        normalizeHorseName(result.places.first.name) === normalizeHorseName(selectionName)
       if (!nameMatches) {
         console.warn(
-          `[Outcome] Number matches (#${selectionNumber}) but name differs: "${selectionName}" vs "${result.winnerName}". Using number as primary.`
+          `[Outcome] Number matches (#${selectionNumber}) but name differs: "${selectionName}" vs "${result.places.first.name}". Using number as primary.`
         )
       }
     }
     return '1/W'
   }
 
+  // Check if placement qualifies for bonus based on promo type
+  const config = PROMO_TYPE_CONFIG[promoType]
+  if (placement.position && config.bonusPlaces.includes(placement.position)) {
+    console.log(
+      `[Outcome] Selection #${selectionNumber} finished ${placement.position}${getOrdinalSuffix(placement.position)} - qualifies for bonus (promo: ${promoType})`
+    )
+    return 'Bonus'
+  }
+
   return '2/L'
+}
+
+/**
+ * Get ordinal suffix for a number (1st, 2nd, 3rd, etc.)
+ */
+function getOrdinalSuffix(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return s[(v - 20) % 10] || s[v] || s[0]
 }
 
 /**

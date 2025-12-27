@@ -1,6 +1,25 @@
 import type { UnitTier } from './index'
 
 /**
+ * Promo types for matched betting
+ */
+export type PromoType =
+  | 'none'           // Standard win/lose - no bonus promo
+  | '2nd_bonus'      // 2nd place = Bonus
+  | '2nd_3rd_bonus'  // 2nd or 3rd place = Bonus
+  | 'bet_back'       // Non-win = Bonus (bet back promos)
+
+/**
+ * Promo type configuration
+ */
+export const PROMO_TYPE_CONFIG: Record<PromoType, { label: string; description: string; bonusPlaces: number[] }> = {
+  'none': { label: 'None', description: 'Standard matched bet', bonusPlaces: [] },
+  '2nd_bonus': { label: '2nd Bonus', description: 'Bonus if 2nd place', bonusPlaces: [2] },
+  '2nd_3rd_bonus': { label: '2nd/3rd', description: 'Bonus if 2nd or 3rd', bonusPlaces: [2, 3] },
+  'bet_back': { label: 'Bet Back', description: 'Bonus if horse loses', bonusPlaces: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] },
+}
+
+/**
  * Outcome types for race tracking
  */
 export type RaceOutcome =
@@ -38,9 +57,26 @@ export interface BetSide {
 }
 
 /**
+ * Place information for a finishing position
+ */
+export interface PlaceInfo {
+  number: number      // Horse/runner number
+  name: string        // Horse name
+  margin?: number     // Winning/placing margin
+  deadHeat?: boolean  // True if dead heat at this position
+}
+
+/**
  * API result data from PuntingForm
  */
 export interface RaceResultData {
+  // Structured placings (1st, 2nd, 3rd)
+  places: {
+    first: PlaceInfo | null
+    second: PlaceInfo | null
+    third: PlaceInfo | null
+  }
+  // Legacy fields for backward compatibility
   winnerName: string
   winnerNumber: number
   position?: number
@@ -76,6 +112,9 @@ export interface TrackedRaceEntry {
     betBackPromos: Record<string, string>
   }
 
+  // Promo type for this race (determines bonus eligibility)
+  promoType: PromoType
+
   // Bet details
   backBet: BetSide                    // Bookie 1 (backing)
   layBet: BetSide                     // Bookie 2 (Betfair/exchange)
@@ -94,6 +133,9 @@ export interface TrackedRaceEntry {
 
   // Profit calculation
   profitLoss?: number                 // Calculated P/L after outcome known
+
+  // Bonus tracking (link to The Stable)
+  generatedBonusId?: string           // ID of bonus created when outcome = Bonus
 
   // Metadata
   lockedInAt: string                  // ISO timestamp when locked in

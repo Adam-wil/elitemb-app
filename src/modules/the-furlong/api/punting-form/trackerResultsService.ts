@@ -47,32 +47,53 @@ export async function fetchRaceResult(
       return null
     }
 
-    // Extract winner (position 1)
-    const winner = raceResult.runners.find((r) => r.position === 1)
-    if (!winner) {
+    // Extract 1st, 2nd, 3rd place finishers
+    const first = raceResult.runners.find((r) => r.position === 1)
+    const second = raceResult.runners.find((r) => r.position === 2)
+    const third = raceResult.runners.find((r) => r.position === 3)
+
+    if (!first) {
       return null
     }
 
-    // Check for dead heat (multiple runners with position 1)
-    const deadHeat = raceResult.runners.filter((r) => r.position === 1).length > 1
+    // Check for dead heats at each position
+    const firstDeadHeat = raceResult.runners.filter((r) => r.position === 1).length > 1
+    const secondDeadHeat = raceResult.runners.filter((r) => r.position === 2).length > 1
+    const thirdDeadHeat = raceResult.runners.filter((r) => r.position === 3).length > 1
 
     // Get scratched runners (runners with position 0 or no position typically indicate scratched)
-    // The API may use different indicators, adjust as needed
     const scratched = raceResult.runners
       .filter((r) => r.position === 0 || r.position === 99)
       .map((r) => r.tabNo)
 
     const result: RaceResultData = {
-      winnerName: winner.runner,
-      winnerNumber: winner.tabNo,
-      position: winner.position,
-      margin: winner.margin,
-      deadHeat,
+      // Structured placings
+      places: {
+        first: first
+          ? { number: first.tabNo, name: first.runner, margin: first.margin, deadHeat: firstDeadHeat }
+          : null,
+        second: second
+          ? { number: second.tabNo, name: second.runner, margin: second.margin, deadHeat: secondDeadHeat }
+          : null,
+        third: third
+          ? { number: third.tabNo, name: third.runner, margin: third.margin, deadHeat: thirdDeadHeat }
+          : null,
+      },
+      // Legacy fields for backward compatibility
+      winnerName: first.runner,
+      winnerNumber: first.tabNo,
+      position: first.position,
+      margin: first.margin,
+      deadHeat: firstDeadHeat,
       scratched,
       fetchedAt: new Date().toISOString(),
     }
 
-    console.log(`[TrackerResults] Winner: #${result.winnerNumber} ${result.winnerName}`)
+    console.log(
+      `[TrackerResults] Places: 1st #${result.places.first?.number} ${result.places.first?.name}, ` +
+        `2nd #${result.places.second?.number || '-'} ${result.places.second?.name || '-'}, ` +
+        `3rd #${result.places.third?.number || '-'} ${result.places.third?.name || '-'}`
+    )
     return result
   } catch (error) {
     console.error('fetchRaceResult error:', error)
@@ -186,23 +207,42 @@ export async function fetchResultsForTracks(
           continue
         }
 
-        const winner = raceResult.runners.find((r) => r.position === 1)
-        if (!winner) {
+        // Extract 1st, 2nd, 3rd place finishers
+        const first = raceResult.runners.find((r) => r.position === 1)
+        const second = raceResult.runners.find((r) => r.position === 2)
+        const third = raceResult.runners.find((r) => r.position === 3)
+
+        if (!first) {
           results.set(`${track}:${race.raceNumber}`, null)
           continue
         }
 
-        const deadHeat = raceResult.runners.filter((r) => r.position === 1).length > 1
+        // Check for dead heats at each position
+        const firstDeadHeat = raceResult.runners.filter((r) => r.position === 1).length > 1
+        const secondDeadHeat = raceResult.runners.filter((r) => r.position === 2).length > 1
+        const thirdDeadHeat = raceResult.runners.filter((r) => r.position === 3).length > 1
+
         const scratched = raceResult.runners
           .filter((r) => r.position === 0 || r.position === 99)
           .map((r) => r.tabNo)
 
         results.set(`${track}:${race.raceNumber}`, {
-          winnerName: winner.runner,
-          winnerNumber: winner.tabNo,
-          position: winner.position,
-          margin: winner.margin,
-          deadHeat,
+          places: {
+            first: first
+              ? { number: first.tabNo, name: first.runner, margin: first.margin, deadHeat: firstDeadHeat }
+              : null,
+            second: second
+              ? { number: second.tabNo, name: second.runner, margin: second.margin, deadHeat: secondDeadHeat }
+              : null,
+            third: third
+              ? { number: third.tabNo, name: third.runner, margin: third.margin, deadHeat: thirdDeadHeat }
+              : null,
+          },
+          winnerName: first.runner,
+          winnerNumber: first.tabNo,
+          position: first.position,
+          margin: first.margin,
+          deadHeat: firstDeadHeat,
           scratched,
           fetchedAt: new Date().toISOString(),
         })
