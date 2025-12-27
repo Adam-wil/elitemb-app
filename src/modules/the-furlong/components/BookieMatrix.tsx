@@ -1,7 +1,7 @@
 'use client'
 
 import { Box, Chip, Tooltip, Typography } from '@mui/material'
-import type { BookiePromo } from '../types'
+import type { BookiePromo, ChipRatioStatus } from '../types'
 
 interface BookieMatrixProps {
   promosByBookie: BookiePromo[]
@@ -9,6 +9,7 @@ interface BookieMatrixProps {
   onSelectionChange: (bookies: string[]) => void
   maxSelections?: number
   compact?: boolean
+  ratioUsage?: Record<string, ChipRatioStatus>
 }
 
 /**
@@ -21,6 +22,7 @@ export function BookieMatrix({
   onSelectionChange,
   maxSelections = 3,
   compact = false,
+  ratioUsage,
 }: BookieMatrixProps) {
   const handleBookieClick = (bookie: string, hasPromo: boolean) => {
     if (!hasPromo) return // Can't select bookies without promos
@@ -96,37 +98,92 @@ export function BookieMatrix({
       {availableBookies.map((bp) => {
         const isSelected = selectedBookies.includes(bp.bookie)
         const shortName = getShortName(bp.bookie)
+        const ratioStatus = ratioUsage?.[bp.bookie]
+
+        // Build tooltip content
+        const tooltipContent = (
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {bp.bookie}: {bp.promo}
+            </Typography>
+            {ratioStatus && ratioStatus.status !== 'none' && (
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  mt: 0.5,
+                  color:
+                    ratioStatus.status === 'exceeded'
+                      ? '#ef5350'
+                      : ratioStatus.status === 'warning'
+                        ? '#ff9800'
+                        : 'inherit',
+                }}
+              >
+                Ratio: {ratioStatus.ratioDisplay}
+                {ratioStatus.status === 'warning' && ' (Approaching limit)'}
+                {ratioStatus.status === 'exceeded' && ' (Limit exceeded!)'}
+              </Typography>
+            )}
+          </Box>
+        )
 
         return (
-          <Tooltip
-            key={bp.bookie}
-            title={`${bp.bookie}: ${bp.promo}`}
-            arrow
-            placement="top"
-          >
-            <Chip
-              label={shortName}
-              size="small"
-              onClick={() => handleBookieClick(bp.bookie, true)}
-              sx={{
-                minWidth: compact ? 32 : 40,
-                height: compact ? 20 : 24,
-                fontSize: compact ? '0.65rem' : '0.7rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                backgroundColor: isSelected ? 'primary.main' : 'success.light',
-                color: isSelected ? 'white' : 'success.dark',
-                border: isSelected ? '2px solid' : '1px solid',
-                borderColor: isSelected ? 'primary.dark' : 'success.main',
-                '&:hover': {
-                  backgroundColor: isSelected ? 'primary.dark' : 'success.main',
-                  color: 'white',
-                },
-                '& .MuiChip-label': {
-                  padding: compact ? '0 4px' : '0 6px',
-                },
-              }}
-            />
+          <Tooltip key={bp.bookie} title={tooltipContent} arrow placement="top">
+            <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+              <Chip
+                label={shortName}
+                size="small"
+                onClick={() => handleBookieClick(bp.bookie, true)}
+                sx={{
+                  minWidth: compact ? 32 : 40,
+                  height: compact ? 20 : 24,
+                  fontSize: compact ? '0.65rem' : '0.7rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  backgroundColor: isSelected ? 'primary.main' : 'success.light',
+                  color: isSelected ? 'white' : 'success.dark',
+                  border: isSelected ? '2px solid' : '1px solid',
+                  borderColor: isSelected ? 'primary.dark' : 'success.main',
+                  '&:hover': {
+                    backgroundColor: isSelected ? 'primary.dark' : 'success.main',
+                    color: 'white',
+                  },
+                  '& .MuiChip-label': {
+                    padding: compact ? '0 4px' : '0 6px',
+                  },
+                }}
+              />
+              {/* Ratio status indicator dot */}
+              {ratioStatus?.status === 'warning' && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: '#ff9800',
+                    border: '1px solid white',
+                  }}
+                />
+              )}
+              {ratioStatus?.status === 'exceeded' && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: -2,
+                    right: -2,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: '#ef5350',
+                    border: '1px solid white',
+                  }}
+                />
+              )}
+            </Box>
           </Tooltip>
         )
       })}

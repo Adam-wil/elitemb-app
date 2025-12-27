@@ -22,6 +22,7 @@ model Profile {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   bookieNotes          BookieNote[]
+  bookieRatioConfigs   BookieRatioConfig[]
   bonuses              Bonus[]
   commissionPreference CommissionPreference?
   layManagerEntries    LayManagerEntry[]
@@ -34,9 +35,9 @@ model Profile {
 
 /// 134 Australian/NZ bookies with all metadata
 model Bookie {
-  id                  Int          @id @default(autoincrement())
-  name                String       @unique
-  normalizedName      String       @unique
+  id                  Int                 @id @default(autoincrement())
+  name                String              @unique
+  normalizedName      String              @unique
   signUpOffers        String?
   linkedBookies       String?
   accountSetupNotes   String?
@@ -53,11 +54,12 @@ model Bookie {
   website             String?
   bookieSoftware      String?
   stateOfRegistration String?
-  isExchange          Boolean      @default(false)
-  isActive            Boolean      @default(true)
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  isExchange          Boolean             @default(false)
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
   bookieNotes         BookieNote[]
+  ratioConfigs        BookieRatioConfig[]
 }
 
 /// State commission rates for Betfair based on track location
@@ -261,6 +263,20 @@ enum RiskLevel {
   HIGH
 }
 
+enum RatioTimeWindow {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum BookieAccountStatus {
+  PROMO_ELIGIBLE
+  GUBBED
+  STAT_DECD
+  SUSPENDED
+  CLOSED
+}
+
 enum BonusStatus {
   PENDING
   TURNED_OVER
@@ -296,5 +312,31 @@ model Bonus {
   @@index([profileId, status])
   @@index([bookie])
   @@index([expiryDate])
+  @@index([status])
+}
+
+/// Bookie Health - Promo ratio configuration per bookie
+/// Tracks target promo:non-promo ratios to help avoid being gubbed
+model BookieRatioConfig {
+  id                String              @id @default(uuid())
+  profileId         String
+  bookieId          Int
+  promoRatio        Int                 @default(1)
+  nonPromoRatio     Int                 @default(3)
+  timeWindow        RatioTimeWindow     @default(WEEKLY)
+  status            BookieAccountStatus @default(PROMO_ELIGIBLE)
+  statusNotes       String?
+  statusChangedAt   DateTime?
+  warningThreshold  Int                 @default(80)
+  exceededThreshold Int                 @default(100)
+  isEnabled         Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  profile           Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookie            Bookie              @relation(fields: [bookieId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, bookieId])
+  @@index([profileId])
   @@index([status])
 }

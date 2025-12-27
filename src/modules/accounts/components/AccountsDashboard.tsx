@@ -13,7 +13,7 @@ import {
   Chip,
   Alert,
 } from '@mui/material'
-import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft } from 'lucide-react'
+import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft, HeartPulse } from 'lucide-react'
 import { useBasiqConnection } from '../hooks/useBasiqConnection'
 import { useTransactions, getDefaultDateRange } from '../hooks/useTransactions'
 import { useBonusCredits } from '../hooks/useBonusCredits'
@@ -21,6 +21,7 @@ import { useBookieBalances } from '../hooks/useBookieBalances'
 import { BankAccountsTab } from './BankAccountsTab'
 import { RacingPLTab } from './RacingPLTab'
 import { ConnectionSetup } from './ConnectionSetup'
+import { BookieHealthTab } from './BookieHealthTab'
 
 // ============================================================================
 // Types
@@ -219,6 +220,14 @@ export function AccountsDashboard() {
                 </Box>
               }
             />
+            <Tab
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <HeartPulse size={16} />
+                  Bookie Health
+                </Box>
+              }
+            />
           </Tabs>
         </Box>
 
@@ -247,6 +256,9 @@ export function AccountsDashboard() {
               onSetOverride={setOverride}
               onClearOverride={clearOverride}
             />
+          </TabPanel>
+          <TabPanel value={tabValue} index={2}>
+            <BookieHealthTab />
           </TabPanel>
         </Box>
       </Paper>

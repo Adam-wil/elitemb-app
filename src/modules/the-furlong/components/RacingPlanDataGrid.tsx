@@ -8,6 +8,7 @@ import { UNIT_TIER_CONFIG } from '../types'
 import { convertRaceTime } from '../utils/timezones'
 import { BookieMatrix } from './BookieMatrix'
 import { MobileRacingPlanCard } from './MobileRacingPlanCard'
+import { useBookieHealth } from '../hooks'
 
 interface RacingPlanDataGridProps {
   entries: RacingPlanEntry[]
@@ -48,6 +49,19 @@ export function RacingPlanDataGrid({
       time: convertRaceTime(entry.time, selectedDateISO, timezone),
     }))
   }, [entries, selectedDateISO, timezone])
+
+  // Extract unique bookie names from all entries for health checking
+  const bookieNames = useMemo(() => {
+    const names = new Set<string>()
+    entries.forEach((entry) => {
+      entry.normalPromosByBookie?.forEach((bp) => names.add(bp.bookie))
+      entry.betBackPromosByBookie?.forEach((bp) => names.add(bp.bookie))
+    })
+    return Array.from(names)
+  }, [entries])
+
+  // Fetch bookie health/ratio usage data
+  const { data: ratioUsage } = useBookieHealth(bookieNames)
 
   useEffect(() => {
     import('@mui/x-data-grid').then((mod) => {
@@ -374,6 +388,7 @@ export function RacingPlanDataGrid({
             onSelectionChange={(bookies) => handleNormalBookieChange(params.row.id, bookies)}
             maxSelections={3}
             compact
+            ratioUsage={ratioUsage ?? undefined}
           />
         )
       },
@@ -405,6 +420,7 @@ export function RacingPlanDataGrid({
             onSelectionChange={(bookies) => handleBetBackBookieChange(params.row.id, bookies)}
             maxSelections={3}
             compact
+            ratioUsage={ratioUsage ?? undefined}
           />
         )
       },

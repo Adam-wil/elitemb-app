@@ -61,6 +61,9 @@ export * from './tracker'
 // Re-export dashboard types
 export * from './dashboard'
 
+// Re-export bookie health types
+export * from './bookieHealth'
+
 // Known Australian race tracks for detection
 export const KNOWN_TRACKS = [
   'BALLARAT', 'DOOMBEN', 'ASCOT', 'CAULFIELD', 'ROSEHILL',
