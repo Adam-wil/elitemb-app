@@ -27,7 +27,7 @@ import {
   Timeline as TimelineIcon,
   TableChart as TableChartIcon,
 } from '@mui/icons-material'
-import { CircleStar, CalendarDays } from 'lucide-react'
+import { CircleStar, CalendarDays, BookOpen, Warehouse } from 'lucide-react'
 import { useState } from 'react'
 
 const DRAWER_WIDTH = 240
@@ -49,7 +49,9 @@ const navItems: NavItem[] = [
       { text: 'Racing Dashboard', path: '/dashboard/the-furlong/racing-dashboard', icon: <DashboardIcon /> },
       { text: 'Planner', path: '/dashboard/the-furlong/planner', icon: <CalendarDays size={20} /> },
       { text: 'Racing Manager', path: '/dashboard/the-furlong/racing-tracker', icon: <TimelineIcon /> },
+      { text: 'The Stable', path: '/dashboard/the-furlong/the-stable', icon: <Warehouse size={20} /> },
       { text: 'Lay Manager', path: '/dashboard/non-promo', icon: <TableChartIcon /> },
+      { text: 'Bookie List', path: '/dashboard/the-furlong/bookie-list', icon: <BookOpen size={20} /> },
     ],
   },
   { text: 'Accounts', icon: <AccountBalanceIcon />, path: '/dashboard/accounts' },

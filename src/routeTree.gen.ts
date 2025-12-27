@@ -15,9 +15,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
 import { Route as DashboardNonPromoRouteImport } from './routes/dashboard/non-promo'
 import { Route as DashboardAccountsIndexRouteImport } from './routes/dashboard/accounts/index'
+import { Route as DashboardTheFurlongTheStableRouteImport } from './routes/dashboard/the-furlong/the-stable'
 import { Route as DashboardTheFurlongRacingTrackerRouteImport } from './routes/dashboard/the-furlong/racing-tracker'
 import { Route as DashboardTheFurlongRacingDashboardRouteImport } from './routes/dashboard/the-furlong/racing-dashboard'
 import { Route as DashboardTheFurlongPlannerRouteImport } from './routes/dashboard/the-furlong/planner'
+import { Route as DashboardTheFurlongBookieListRouteImport } from './routes/dashboard/the-furlong/bookie-list'
 import { Route as DashboardAccountsSetupRouteImport } from './routes/dashboard/accounts/setup'
 import { Route as DashboardAccountsOverviewRouteImport } from './routes/dashboard/accounts/overview'
 
@@ -51,6 +53,12 @@ const DashboardAccountsIndexRoute = DashboardAccountsIndexRouteImport.update({
   path: '/accounts/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardTheFurlongTheStableRoute =
+  DashboardTheFurlongTheStableRouteImport.update({
+    id: '/the-furlong/the-stable',
+    path: '/the-furlong/the-stable',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardTheFurlongRacingTrackerRoute =
   DashboardTheFurlongRacingTrackerRouteImport.update({
     id: '/the-furlong/racing-tracker',
@@ -67,6 +75,12 @@ const DashboardTheFurlongPlannerRoute =
   DashboardTheFurlongPlannerRouteImport.update({
     id: '/the-furlong/planner',
     path: '/the-furlong/planner',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardTheFurlongBookieListRoute =
+  DashboardTheFurlongBookieListRouteImport.update({
+    id: '/the-furlong/bookie-list',
+    path: '/the-furlong/bookie-list',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
 const DashboardAccountsSetupRoute = DashboardAccountsSetupRouteImport.update({
@@ -89,9 +103,11 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/accounts/overview': typeof DashboardAccountsOverviewRoute
   '/dashboard/accounts/setup': typeof DashboardAccountsSetupRoute
+  '/dashboard/the-furlong/bookie-list': typeof DashboardTheFurlongBookieListRoute
   '/dashboard/the-furlong/planner': typeof DashboardTheFurlongPlannerRoute
   '/dashboard/the-furlong/racing-dashboard': typeof DashboardTheFurlongRacingDashboardRoute
   '/dashboard/the-furlong/racing-tracker': typeof DashboardTheFurlongRacingTrackerRoute
+  '/dashboard/the-furlong/the-stable': typeof DashboardTheFurlongTheStableRoute
   '/dashboard/accounts': typeof DashboardAccountsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -101,9 +117,11 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/accounts/overview': typeof DashboardAccountsOverviewRoute
   '/dashboard/accounts/setup': typeof DashboardAccountsSetupRoute
+  '/dashboard/the-furlong/bookie-list': typeof DashboardTheFurlongBookieListRoute
   '/dashboard/the-furlong/planner': typeof DashboardTheFurlongPlannerRoute
   '/dashboard/the-furlong/racing-dashboard': typeof DashboardTheFurlongRacingDashboardRoute
   '/dashboard/the-furlong/racing-tracker': typeof DashboardTheFurlongRacingTrackerRoute
+  '/dashboard/the-furlong/the-stable': typeof DashboardTheFurlongTheStableRoute
   '/dashboard/accounts': typeof DashboardAccountsIndexRoute
 }
 export interface FileRoutesById {
@@ -115,9 +133,11 @@ export interface FileRoutesById {
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/accounts/overview': typeof DashboardAccountsOverviewRoute
   '/dashboard/accounts/setup': typeof DashboardAccountsSetupRoute
+  '/dashboard/the-furlong/bookie-list': typeof DashboardTheFurlongBookieListRoute
   '/dashboard/the-furlong/planner': typeof DashboardTheFurlongPlannerRoute
   '/dashboard/the-furlong/racing-dashboard': typeof DashboardTheFurlongRacingDashboardRoute
   '/dashboard/the-furlong/racing-tracker': typeof DashboardTheFurlongRacingTrackerRoute
+  '/dashboard/the-furlong/the-stable': typeof DashboardTheFurlongTheStableRoute
   '/dashboard/accounts/': typeof DashboardAccountsIndexRoute
 }
 export interface FileRouteTypes {
@@ -130,9 +150,11 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/accounts/overview'
     | '/dashboard/accounts/setup'
+    | '/dashboard/the-furlong/bookie-list'
     | '/dashboard/the-furlong/planner'
     | '/dashboard/the-furlong/racing-dashboard'
     | '/dashboard/the-furlong/racing-tracker'
+    | '/dashboard/the-furlong/the-stable'
     | '/dashboard/accounts'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -142,9 +164,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/dashboard/accounts/overview'
     | '/dashboard/accounts/setup'
+    | '/dashboard/the-furlong/bookie-list'
     | '/dashboard/the-furlong/planner'
     | '/dashboard/the-furlong/racing-dashboard'
     | '/dashboard/the-furlong/racing-tracker'
+    | '/dashboard/the-furlong/the-stable'
     | '/dashboard/accounts'
   id:
     | '__root__'
@@ -155,9 +179,11 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/dashboard/accounts/overview'
     | '/dashboard/accounts/setup'
+    | '/dashboard/the-furlong/bookie-list'
     | '/dashboard/the-furlong/planner'
     | '/dashboard/the-furlong/racing-dashboard'
     | '/dashboard/the-furlong/racing-tracker'
+    | '/dashboard/the-furlong/the-stable'
     | '/dashboard/accounts/'
   fileRoutesById: FileRoutesById
 }
@@ -211,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAccountsIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/dashboard/the-furlong/the-stable': {
+      id: '/dashboard/the-furlong/the-stable'
+      path: '/the-furlong/the-stable'
+      fullPath: '/dashboard/the-furlong/the-stable'
+      preLoaderRoute: typeof DashboardTheFurlongTheStableRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/dashboard/the-furlong/racing-tracker': {
       id: '/dashboard/the-furlong/racing-tracker'
       path: '/the-furlong/racing-tracker'
@@ -230,6 +263,13 @@ declare module '@tanstack/react-router' {
       path: '/the-furlong/planner'
       fullPath: '/dashboard/the-furlong/planner'
       preLoaderRoute: typeof DashboardTheFurlongPlannerRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/dashboard/the-furlong/bookie-list': {
+      id: '/dashboard/the-furlong/bookie-list'
+      path: '/the-furlong/bookie-list'
+      fullPath: '/dashboard/the-furlong/bookie-list'
+      preLoaderRoute: typeof DashboardTheFurlongBookieListRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/dashboard/accounts/setup': {
@@ -254,9 +294,11 @@ interface DashboardRouteRouteChildren {
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardAccountsOverviewRoute: typeof DashboardAccountsOverviewRoute
   DashboardAccountsSetupRoute: typeof DashboardAccountsSetupRoute
+  DashboardTheFurlongBookieListRoute: typeof DashboardTheFurlongBookieListRoute
   DashboardTheFurlongPlannerRoute: typeof DashboardTheFurlongPlannerRoute
   DashboardTheFurlongRacingDashboardRoute: typeof DashboardTheFurlongRacingDashboardRoute
   DashboardTheFurlongRacingTrackerRoute: typeof DashboardTheFurlongRacingTrackerRoute
+  DashboardTheFurlongTheStableRoute: typeof DashboardTheFurlongTheStableRoute
   DashboardAccountsIndexRoute: typeof DashboardAccountsIndexRoute
 }
 
@@ -265,10 +307,12 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardAccountsOverviewRoute: DashboardAccountsOverviewRoute,
   DashboardAccountsSetupRoute: DashboardAccountsSetupRoute,
+  DashboardTheFurlongBookieListRoute: DashboardTheFurlongBookieListRoute,
   DashboardTheFurlongPlannerRoute: DashboardTheFurlongPlannerRoute,
   DashboardTheFurlongRacingDashboardRoute:
     DashboardTheFurlongRacingDashboardRoute,
   DashboardTheFurlongRacingTrackerRoute: DashboardTheFurlongRacingTrackerRoute,
+  DashboardTheFurlongTheStableRoute: DashboardTheFurlongTheStableRoute,
   DashboardAccountsIndexRoute: DashboardAccountsIndexRoute,
 }
 
