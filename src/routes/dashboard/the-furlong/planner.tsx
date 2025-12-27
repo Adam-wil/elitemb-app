@@ -55,10 +55,35 @@ export const Route = createFileRoute('/dashboard/the-furlong/planner')({
   component: PlannerPage,
 })
 
+// Storage key for persisting planner session
+const PLANNER_SESSION_KEY = 'elitemb-planner-session'
+
+// Load plans from localStorage
+function loadPlannerSession(): Record<string, RacingPlanEntry[]> {
+  try {
+    const stored = localStorage.getItem(PLANNER_SESSION_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch (err) {
+    console.error('Failed to load planner session:', err)
+  }
+  return {}
+}
+
+// Save plans to localStorage
+function savePlannerSession(plans: Record<string, RacingPlanEntry[]>) {
+  try {
+    localStorage.setItem(PLANNER_SESSION_KEY, JSON.stringify(plans))
+  } catch (err) {
+    console.error('Failed to save planner session:', err)
+  }
+}
+
 function PlannerPage() {
   const navigate = useNavigate()
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(dayjs())
-  const [plansByDate, setPlansByDate] = useState<Record<string, RacingPlanEntry[]>>({})
+  const [plansByDate, setPlansByDate] = useState<Record<string, RacingPlanEntry[]>>(loadPlannerSession)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -99,6 +124,11 @@ function PlannerPage() {
   useEffect(() => {
     setArchivedDates(getArchivedDates())
   }, [])
+
+  // Save plans to localStorage whenever they change
+  useEffect(() => {
+    savePlannerSession(plansByDate)
+  }, [plansByDate])
 
   const selectedDateStr = selectedDate?.format('YYYY-MM-DD') || ''
   const selectedDateDisplay = selectedDate?.format('dddd, MMMM D, YYYY') || ''
