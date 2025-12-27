@@ -55,7 +55,7 @@ function LoginPage() {
                 letterSpacing: '-0.5px',
               }}
             >
-              EliteMB
+              Systematic
             </Typography>
           </Link>
         </Box>
@@ -242,7 +242,7 @@ function LoginPage() {
                 mb: 1,
               }}
             >
-              EliteMB
+              Systematic
             </Typography>
             <Typography
               variant="body2"

@@ -60,6 +60,7 @@
     "prisma": "^7.2.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
+    "recharts": "^3.6.0",
     "tailwindcss": "^4.1.17",
     "xlsx": "^0.18.5"
   },

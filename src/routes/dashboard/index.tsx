@@ -13,7 +13,7 @@ function DashboardPage() {
       </Typography>
       <Paper sx={{ p: 3 }}>
         <Typography color="text.secondary">
-          Welcome to your EliteMB dashboard.
+          Welcome to your Systematic dashboard.
         </Typography>
       </Paper>
     </Box>

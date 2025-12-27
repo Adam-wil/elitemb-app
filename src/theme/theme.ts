@@ -4,10 +4,13 @@ export const theme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: '#1976d2',
+      main: '#1f2937', // Charcoal black
+      light: '#374151',
+      dark: '#111827',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#9c27b0',
+      main: '#6b7280', // Neutral gray
     },
   },
   typography: {

@@ -58,6 +58,9 @@ export interface DailyRacingPlan {
 // Re-export tracker types
 export * from './tracker'
 
+// Re-export dashboard types
+export * from './dashboard'
+
 // Known Australian race tracks for detection
 export const KNOWN_TRACKS = [
   'BALLARAT', 'DOOMBEN', 'ASCOT', 'CAULFIELD', 'ROSEHILL',

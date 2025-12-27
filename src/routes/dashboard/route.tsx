@@ -206,6 +206,8 @@ function DashboardLayout() {
                       sx={{
                         minWidth: 0,
                         mr: collapsed ? 0 : 2,
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
                         color: isParentActive(item.children) ? 'primary.main' : 'inherit',
                       }}
@@ -239,6 +241,9 @@ function DashboardLayout() {
                                 sx={{
                                   minWidth: 0,
                                   mr: 2,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                   color: isActive(child.path) ? 'primary.main' : 'inherit',
                                 }}
                               >
@@ -276,6 +281,8 @@ function DashboardLayout() {
                       sx={{
                         minWidth: 0,
                         mr: collapsed ? 0 : 2,
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
                         color: isActive(item.path!) ? 'primary.main' : 'inherit',
                       }}
@@ -315,6 +322,8 @@ function DashboardLayout() {
                       sx={{
                         minWidth: 0,
                         mr: 2,
+                        display: 'flex',
+                        alignItems: 'center',
                         justifyContent: 'center',
                         color: isParentActive(item.children) ? 'primary.main' : 'inherit',
                       }}
@@ -344,6 +353,9 @@ function DashboardLayout() {
                               sx={{
                                 minWidth: 0,
                                 mr: 2,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 color: isActive(child.path) ? 'primary.main' : 'inherit',
                               }}
                             >
@@ -379,6 +391,8 @@ function DashboardLayout() {
                     sx={{
                       minWidth: 0,
                       mr: 2,
+                      display: 'flex',
+                      alignItems: 'center',
                       justifyContent: 'center',
                       color: isActive(item.path!) ? 'primary.main' : 'inherit',
                     }}
@@ -419,7 +433,7 @@ function DashboardLayout() {
               <MenuIcon />
             </IconButton>
             <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-              EliteMB
+              Systematic
             </Typography>
           </Box>
           <IconButton onClick={handleProfileClick}>
@@ -535,6 +549,9 @@ function DashboardLayout() {
                         sx={{
                           minWidth: 0,
                           mr: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                           color: isActive(child.path) ? 'primary.main' : 'inherit',
                         }}
                       >
@@ -640,7 +657,7 @@ function DashboardLayout() {
       >
         <Box className="flex justify-between items-center">
           <Typography variant="caption" color="text.secondary">
-            2024 EliteMB. All rights reserved.
+            2024 Systematic. All rights reserved.
           </Typography>
           <Box className="flex gap-4">
             <MuiLink

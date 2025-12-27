@@ -5,6 +5,12 @@ export { RacingPlanDataGrid } from './RacingPlanDataGrid'
 export { TimezoneSelector, useTimezone } from './TimezoneSelector'
 export { BookieMatrix } from './BookieMatrix'
 
+// Dashboard components
+export { TimePeriodSelector } from './TimePeriodSelector'
+export { ProfitChart } from './ProfitChart'
+export { MetricCard } from './MetricCard'
+export { DashboardSummary } from './DashboardSummary'
+
 // Tracker components
 export { TrackerDataGrid } from './TrackerDataGrid'
 export { PollingIndicator } from './PollingIndicator'

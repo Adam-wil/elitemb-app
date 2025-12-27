@@ -29,7 +29,7 @@ export function Header({ onMenuClick, showLoginButton = true }: HeaderProps) {
               letterSpacing: '-0.5px',
             }}
           >
-            EliteMB
+            Systematic
           </Typography>
         </Link>
 
