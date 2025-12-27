@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Box, Typography, CircularProgress, Tooltip, Checkbox } from '@mui/material'
+import { Box, Typography, CircularProgress, Tooltip, Checkbox, useTheme, useMediaQuery } from '@mui/material'
 import { CheckCircle, AlertTriangle, Clock, HelpCircle } from 'lucide-react'
 import type { RacingPlanEntry, TimeValidationStatus, BookiePromo, UnitTier } from '../types'
 import { UNIT_TIER_CONFIG } from '../types'
 import { convertRaceTime } from '../utils/timezones'
 import { BookieMatrix } from './BookieMatrix'
+import { MobileRacingPlanCard } from './MobileRacingPlanCard'
 
 interface RacingPlanDataGridProps {
   entries: RacingPlanEntry[]
@@ -31,6 +32,10 @@ export function RacingPlanDataGrid({
   onSelectionChange,
 }: RacingPlanDataGridProps) {
   const [DataGridComponent, setDataGridComponent] = useState<typeof import('@mui/x-data-grid').DataGrid | null>(null)
+
+  // Mobile detection
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
 
   // Convert entry times to selected timezone
   const convertedEntries = useMemo(() => {
@@ -126,10 +131,54 @@ export function RacingPlanDataGrid({
     )
   }
 
-  if (!DataGridComponent) {
+  if (!DataGridComponent && !isMobile) {
     return (
       <Box sx={{ height: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress />
+      </Box>
+    )
+  }
+
+  // Mobile Card View
+  if (isMobile) {
+    return (
+      <Box sx={{ overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+        {/* Select All Header */}
+        {selectable && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mb: 1.5,
+              pb: 1,
+              borderBottom: '1px solid #e5e7eb',
+            }}
+          >
+            <Checkbox
+              checked={allSelected}
+              indeterminate={someSelected}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              size="small"
+            />
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+              {selectedIds.length > 0 ? `${selectedIds.length} of ${selectableEntries.length} selected` : 'Select All'}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Race Cards */}
+        {convertedEntries.map((entry) => (
+          <MobileRacingPlanCard
+            key={entry.id}
+            entry={entry}
+            selectable={selectable}
+            isSelected={selectedIds.includes(entry.id)}
+            onSelectChange={(checked) => handleRowSelect(entry.id, checked)}
+            onNormalBookieChange={(bookies) => handleNormalBookieChange(entry.id, bookies)}
+            onBetBackBookieChange={(bookies) => handleBetBackBookieChange(entry.id, bookies)}
+          />
+        ))}
       </Box>
     )
   }

@@ -342,16 +342,24 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
         onClick={() => !entry.readOnly && handleStartEdit(field, value)}
         sx={{
           cursor: entry.readOnly ? 'default' : 'pointer',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          minHeight: '28px',
+          padding: '10px 12px',
+          borderRadius: '8px',
+          minHeight: '40px',
           display: 'flex',
           alignItems: 'center',
-          '&:hover': entry.readOnly ? {} : { backgroundColor: '#f0f9ff' },
+          backgroundColor: '#fff',
+          border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          transition: 'all 0.15s ease',
+          '&:hover': entry.readOnly ? {} : {
+            borderColor: '#3b82f6',
+            backgroundColor: '#f0f9ff',
+            boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.1)',
+          },
         }}
       >
-        <Typography variant="body2" sx={{ color: value ? '#1f2937' : '#9ca3af' }}>
-          {value || '-'}
+        <Typography variant="body2" sx={{ color: value ? '#1f2937' : '#9ca3af', fontSize: '0.9375rem' }}>
+          {value || 'Tap to enter'}
         </Typography>
       </Box>
     )
@@ -372,12 +380,25 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
     >
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         {/* Header row - Time, Track, Race */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 600, color: '#374151', cursor: 'pointer' }}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flex: 1 }}>
+            {/* Time field */}
+            <Box
               onClick={() => !entry.readOnly && handleStartEdit('time', entry.time)}
+              sx={{
+                cursor: entry.readOnly ? 'default' : 'pointer',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                backgroundColor: '#fff',
+                border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s ease',
+                minWidth: '65px',
+                '&:hover': entry.readOnly ? {} : {
+                  borderColor: '#3b82f6',
+                  backgroundColor: '#f0f9ff',
+                },
+              }}
             >
               {editingField === 'time' ? (
                 <input
@@ -388,25 +409,38 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
                   onKeyDown={handleKeyDown}
                   autoFocus
                   style={{
-                    width: '70px',
-                    padding: '8px 10px',
+                    width: '50px',
+                    padding: 0,
                     fontSize: '0.875rem',
                     fontWeight: 600,
-                    border: '2px solid #3b82f6',
-                    borderRadius: '6px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                    border: 'none',
+                    outline: 'none',
+                    backgroundColor: 'transparent',
                   }}
                 />
               ) : (
-                entry.time || '--:--'
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#374151', fontSize: '0.875rem' }}>
+                  {entry.time || '--:--'}
+                </Typography>
               )}
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#6b7280' }}>|</Typography>
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 500, color: '#1f2937', cursor: 'pointer' }}
+            </Box>
+            {/* Track field */}
+            <Box
               onClick={() => !entry.readOnly && handleStartEdit('track', entry.track)}
+              sx={{
+                cursor: entry.readOnly ? 'default' : 'pointer',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                backgroundColor: '#fff',
+                border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s ease',
+                flex: 1,
+                '&:hover': entry.readOnly ? {} : {
+                  borderColor: '#3b82f6',
+                  backgroundColor: '#f0f9ff',
+                },
+              }}
             >
               {editingField === 'track' ? (
                 <input
@@ -417,23 +451,37 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
                   onKeyDown={handleKeyDown}
                   autoFocus
                   style={{
-                    width: '120px',
-                    padding: '8px 10px',
+                    width: '100%',
+                    padding: 0,
                     fontSize: '0.875rem',
-                    border: '2px solid #3b82f6',
-                    borderRadius: '6px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                    border: 'none',
+                    outline: 'none',
+                    backgroundColor: 'transparent',
                   }}
                 />
               ) : (
-                entry.track || 'Track'
+                <Typography variant="body2" sx={{ fontWeight: 500, color: entry.track ? '#1f2937' : '#9ca3af', fontSize: '0.875rem' }}>
+                  {entry.track || 'Track'}
+                </Typography>
               )}
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{ color: '#6b7280', cursor: 'pointer' }}
+            </Box>
+            {/* Race number field */}
+            <Box
               onClick={() => !entry.readOnly && handleStartEdit('raceNumber', entry.raceNumber)}
+              sx={{
+                cursor: entry.readOnly ? 'default' : 'pointer',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                backgroundColor: '#fff',
+                border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s ease',
+                minWidth: '45px',
+                '&:hover': entry.readOnly ? {} : {
+                  borderColor: '#3b82f6',
+                  backgroundColor: '#f0f9ff',
+                },
+              }}
             >
               {editingField === 'raceNumber' ? (
                 <input
@@ -444,19 +492,20 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
                   onKeyDown={handleKeyDown}
                   autoFocus
                   style={{
-                    width: '50px',
-                    padding: '8px 10px',
+                    width: '35px',
+                    padding: 0,
                     fontSize: '0.875rem',
-                    border: '2px solid #3b82f6',
-                    borderRadius: '6px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                    border: 'none',
+                    outline: 'none',
+                    backgroundColor: 'transparent',
                   }}
                 />
               ) : (
-                `R${entry.raceNumber || '?'}`
+                <Typography variant="body2" sx={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                  R{entry.raceNumber || '?'}
+                </Typography>
               )}
-            </Typography>
+            </Box>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {outcomeConfig && (
@@ -481,11 +530,24 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
         </Box>
 
         {/* Selection row */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 600, color: '#1f2937', minWidth: '24px', cursor: 'pointer' }}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5 }}>
+          {/* Selection number field */}
+          <Box
             onClick={() => !entry.readOnly && handleStartEdit('selectionNumber', entry.selectionNumber)}
+            sx={{
+              cursor: entry.readOnly ? 'default' : 'pointer',
+              padding: '8px 10px',
+              borderRadius: '8px',
+              backgroundColor: '#fff',
+              border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              transition: 'all 0.15s ease',
+              minWidth: '48px',
+              '&:hover': entry.readOnly ? {} : {
+                borderColor: '#3b82f6',
+                backgroundColor: '#f0f9ff',
+              },
+            }}
           >
             {editingField === 'selectionNumber' ? (
               <input
@@ -496,24 +558,38 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
                 onKeyDown={handleKeyDown}
                 autoFocus
                 style={{
-                  width: '50px',
-                  padding: '8px 10px',
+                  width: '35px',
+                  padding: 0,
                   fontSize: '0.875rem',
                   fontWeight: 600,
-                  border: '2px solid #3b82f6',
-                  borderRadius: '6px',
-                  backgroundColor: '#fff',
-                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                  border: 'none',
+                  outline: 'none',
+                  backgroundColor: 'transparent',
                 }}
               />
             ) : (
-              `#${entry.selectionNumber || '?'}`
+              <Typography variant="body2" sx={{ fontWeight: 600, color: entry.selectionNumber ? '#1f2937' : '#9ca3af', fontSize: '0.875rem' }}>
+                #{entry.selectionNumber || '?'}
+              </Typography>
             )}
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: '#1f2937', flex: 1, cursor: 'pointer' }}
+          </Box>
+          {/* Selection name field */}
+          <Box
             onClick={() => !entry.readOnly && handleStartEdit('selectionName', entry.selectionName)}
+            sx={{
+              cursor: entry.readOnly ? 'default' : 'pointer',
+              padding: '8px 10px',
+              borderRadius: '8px',
+              backgroundColor: '#fff',
+              border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              transition: 'all 0.15s ease',
+              flex: 1,
+              '&:hover': entry.readOnly ? {} : {
+                borderColor: '#3b82f6',
+                backgroundColor: '#f0f9ff',
+              },
+            }}
           >
             {editingField === 'selectionName' ? (
               <input
@@ -525,18 +601,19 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
                 autoFocus
                 style={{
                   width: '100%',
-                  padding: '8px 10px',
+                  padding: 0,
                   fontSize: '0.875rem',
-                  border: '2px solid #3b82f6',
-                  borderRadius: '6px',
-                  backgroundColor: '#fff',
-                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                  border: 'none',
+                  outline: 'none',
+                  backgroundColor: 'transparent',
                 }}
               />
             ) : (
-              entry.selectionName || 'Selection'
+              <Typography variant="body2" sx={{ color: entry.selectionName ? '#1f2937' : '#9ca3af', fontSize: '0.875rem' }}>
+                {entry.selectionName || 'Horse Name'}
+              </Typography>
             )}
-          </Typography>
+          </Box>
           {unitTierConfig && (
             <Box
               sx={{

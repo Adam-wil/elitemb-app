@@ -19,6 +19,8 @@ import {
   ListItemIcon,
   ListItemText,
   Divider,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import { Archive, RotateCcw, Trash2 } from 'lucide-react'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -29,6 +31,9 @@ import {
   useTimezone,
   PollingIndicator,
   TrackerSidePanel,
+  MobileBottomNav,
+  MobileCalendarDrawer,
+  MobileSettingsDrawer,
   DEFAULT_COLUMN_VISIBILITY,
   DEFAULT_STATE_COMMISSIONS,
   type ColumnVisibility,
@@ -50,12 +55,20 @@ export const Route = createFileRoute('/dashboard/non-promo')({
 })
 
 function LayManagerPage() {
+  // Mobile detection
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(dayjs())
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [calendarExpanded, setCalendarExpanded] = useState(true)
   const [pollingEnabled, setPollingEnabled] = useState(true)
+
+  // Mobile drawer states
+  const [calendarDrawerOpen, setCalendarDrawerOpen] = useState(false)
+  const [settingsDrawerOpen, setSettingsDrawerOpen] = useState(false)
 
   // Timezone state with persistence
   const { timezone, setTimezone } = useTimezone()
@@ -231,6 +244,198 @@ function LayManagerPage() {
     setSuccess(true)
   }
 
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* Header */}
+        <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, px: 1 }}>
+          Lay Manager
+        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 1, mx: 1 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Mobile Toolbar */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 1,
+            px: 1,
+            py: 0.5,
+            backgroundColor: '#f9fafb',
+            borderRadius: 1,
+            mx: 1,
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {selectedDate?.format('ddd, MMM D')}
+            </Typography>
+            <PollingIndicator status={pollingStatus} onToggle={handleTogglePolling} />
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Tooltip title="Archive options">
+              <IconButton
+                size="small"
+                onClick={handleArchiveClick}
+                sx={{
+                  color: currentDateHasArchive ? 'primary.main' : 'text.secondary',
+                }}
+              >
+                <Archive size={18} />
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={archiveMenuAnchor}
+              open={Boolean(archiveMenuAnchor)}
+              onClose={handleArchiveMenuClose}
+            >
+              <MenuItem onClick={handleArchiveTracker} disabled={!currentDateHasData}>
+                <ListItemIcon>
+                  <Archive size={18} />
+                </ListItemIcon>
+                <ListItemText>
+                  {currentDateHasArchive ? 'Update Archive' : 'Archive Tracker'}
+                </ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleRestoreTracker} disabled={!currentDateHasArchive}>
+                <ListItemIcon>
+                  <RotateCcw size={18} />
+                </ListItemIcon>
+                <ListItemText>Restore from Archive</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={handleDeleteArchive} disabled={!currentDateHasArchive}>
+                <ListItemIcon>
+                  <Trash2 size={18} color="#d32f2f" />
+                </ListItemIcon>
+                <ListItemText sx={{ color: 'error.main' }}>Delete Archive</ListItemText>
+              </MenuItem>
+            </Menu>
+          </Box>
+        </Box>
+
+        {/* Data Grid / Mobile Cards - with bottom padding for nav */}
+        <Box sx={{ flexGrow: 1, overflow: 'auto', pb: '80px', px: 1 }}>
+          <TrackerDataGrid
+            entries={entries}
+            selectedDate={selectedDateDisplay}
+            selectedDateISO={selectedDateStr}
+            timezone={timezone}
+            onEntryUpdate={handleEntryUpdate}
+            onRefreshResult={handleRefreshResult}
+            onAddEntry={addEntry}
+            onAddEntryAbove={addEntryAbove}
+            onDeleteEntry={removeEntry}
+            isPolling={pollingStatus.isPolling}
+            columnVisibility={columnVisibilityModel}
+            stateCommissions={stateCommissions}
+          />
+        </Box>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav
+          onCalendarClick={() => setCalendarDrawerOpen(true)}
+          onSettingsClick={() => setSettingsDrawerOpen(true)}
+          onAddClick={() => addEntry()}
+          hasCalendarData={datesWithData.includes(selectedDateStr)}
+        />
+
+        {/* Mobile Calendar Drawer */}
+        <MobileCalendarDrawer
+          open={calendarDrawerOpen}
+          onClose={() => setCalendarDrawerOpen(false)}
+          onOpen={() => setCalendarDrawerOpen(true)}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
+          datesWithPlans={datesWithData}
+        />
+
+        {/* Mobile Settings Drawer */}
+        <MobileSettingsDrawer
+          open={settingsDrawerOpen}
+          onClose={() => setSettingsDrawerOpen(false)}
+          onOpen={() => setSettingsDrawerOpen(true)}
+          columnVisibility={columnVisibility}
+          onToggleColumn={handleToggleColumn}
+          stateCommissions={stateCommissions}
+          onUpdateStateCommission={handleUpdateStateCommission}
+        />
+
+        {/* Dialogs */}
+        <Dialog open={archiveConfirmDialog} onClose={() => setArchiveConfirmDialog(false)}>
+          <DialogTitle>Archive Tracker</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {currentDateHasArchive
+                ? `This will update the existing archive for ${selectedDateDisplay}. The previous archive will be replaced.`
+                : `Archive the tracker data for ${selectedDateDisplay}? You can restore it later if needed.`}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setArchiveConfirmDialog(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmArchive} variant="contained" autoFocus>
+              {currentDateHasArchive ? 'Update Archive' : 'Archive'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={restoreConfirmDialog} onClose={() => setRestoreConfirmDialog(false)}>
+          <DialogTitle>Restore from Archive</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              This will replace the current tracker data with the archived version. Any unsaved
+              changes will be lost.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRestoreConfirmDialog(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button onClick={performRestore} variant="contained" color="warning" autoFocus>
+              Restore
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog open={deleteArchiveDialog} onClose={() => setDeleteArchiveDialog(false)}>
+          <DialogTitle>Delete Archive</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete the archived tracker for {selectedDateDisplay}? This
+              cannot be undone.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setDeleteArchiveDialog(false)} color="inherit">
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmDeleteArchive} variant="contained" color="error" autoFocus>
+              Delete
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Snackbar
+          open={success}
+          autoHideDuration={5000}
+          onClose={() => setSuccess(false)}
+          message={successMessage}
+        />
+      </Box>
+    )
+  }
+
+  // Desktop layout
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>

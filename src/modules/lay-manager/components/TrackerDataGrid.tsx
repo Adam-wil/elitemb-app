@@ -822,16 +822,28 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
         onClick={() => !entry.readOnly && handleStartEdit(field, value)}
         sx={{
           cursor: entry.readOnly ? 'default' : 'pointer',
-          padding: '4px 8px',
-          borderRadius: '4px',
-          minHeight: '28px',
+          padding: '10px 12px',
+          borderRadius: '8px',
+          minHeight: '40px',
           display: 'flex',
           alignItems: 'center',
-          '&:hover': entry.readOnly ? {} : { backgroundColor: '#f0f9ff' },
+          backgroundColor: '#fff',
+          border: entry.readOnly ? '1px solid #e5e7eb' : '1.5px solid #d1d5db',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+          transition: 'all 0.15s ease',
+          '&:hover': entry.readOnly ? {} : {
+            borderColor: '#3b82f6',
+            backgroundColor: '#f0f9ff',
+            boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.1)',
+          },
+          '&:active': entry.readOnly ? {} : {
+            borderColor: '#2563eb',
+            backgroundColor: '#e0f2fe',
+          },
         }}
       >
-        <Typography variant="body2" sx={{ color: value ? '#1f2937' : '#9ca3af' }}>
-          {value || '-'}
+        <Typography variant="body2" sx={{ color: value ? '#1f2937' : '#9ca3af', fontSize: '0.9375rem' }}>
+          {value || 'Tap to enter'}
         </Typography>
       </Box>
     )
@@ -852,90 +864,116 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         {/* Header row - Time, Track, Race */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 600, color: '#374151', cursor: 'pointer' }}
-              onClick={() => !entry.readOnly && handleStartEdit('time', entry.time)}
-            >
-              {editingField === 'time' ? (
-                <input
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={handleSaveEdit}
-                  onKeyDown={handleKeyDown}
-                  autoFocus
-                  style={{
-                    width: '70px',
-                    padding: '8px 10px',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    border: '2px solid #3b82f6',
-                    borderRadius: '6px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
-                  }}
-                />
-              ) : (
-                entry.time || '--:--'
-              )}
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#6b7280' }}>|</Typography>
-            <Typography
-              variant="body2"
-              sx={{ fontWeight: 500, color: '#1f2937', cursor: 'pointer' }}
-              onClick={() => !entry.readOnly && handleStartEdit('track', entry.track)}
-            >
-              {editingField === 'track' ? (
-                <input
-                  type="text"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={handleSaveEdit}
-                  onKeyDown={handleKeyDown}
-                  autoFocus
-                  style={{
-                    width: '120px',
-                    padding: '8px 10px',
-                    fontSize: '0.875rem',
-                    border: '2px solid #3b82f6',
-                    borderRadius: '6px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
-                  }}
-                />
-              ) : (
-                entry.track || 'Track'
-              )}
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{ color: '#6b7280', cursor: 'pointer' }}
-              onClick={() => !entry.readOnly && handleStartEdit('raceNumber', entry.raceNumber)}
-            >
-              {editingField === 'raceNumber' ? (
-                <input
-                  type="number"
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={handleSaveEdit}
-                  onKeyDown={handleKeyDown}
-                  autoFocus
-                  style={{
-                    width: '50px',
-                    padding: '8px 10px',
-                    fontSize: '0.875rem',
-                    border: '2px solid #3b82f6',
-                    borderRadius: '6px',
-                    backgroundColor: '#fff',
-                    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
-                  }}
-                />
-              ) : (
-                `R${entry.raceNumber || '?'}`
-              )}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            {editingField === 'time' ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleSaveEdit}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                style={{
+                  width: '70px',
+                  padding: '8px 10px',
+                  fontSize: '0.875rem',
+                  fontWeight: 600,
+                  border: '2px solid #3b82f6',
+                  borderRadius: '6px',
+                  backgroundColor: '#fff',
+                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                }}
+              />
+            ) : (
+              <Box
+                onClick={() => !entry.readOnly && handleStartEdit('time', entry.time)}
+                sx={{
+                  px: 1.5,
+                  py: 0.75,
+                  borderRadius: '6px',
+                  border: '1.5px solid #d1d5db',
+                  backgroundColor: '#fff',
+                  cursor: entry.readOnly ? 'default' : 'pointer',
+                  '&:hover': entry.readOnly ? {} : { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 600, color: entry.time ? '#374151' : '#9ca3af' }}>
+                  {entry.time || '--:--'}
+                </Typography>
+              </Box>
+            )}
+            {editingField === 'track' ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleSaveEdit}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                style={{
+                  width: '120px',
+                  padding: '8px 10px',
+                  fontSize: '0.875rem',
+                  border: '2px solid #3b82f6',
+                  borderRadius: '6px',
+                  backgroundColor: '#fff',
+                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                }}
+              />
+            ) : (
+              <Box
+                onClick={() => !entry.readOnly && handleStartEdit('track', entry.track)}
+                sx={{
+                  px: 1.5,
+                  py: 0.75,
+                  borderRadius: '6px',
+                  border: '1.5px solid #d1d5db',
+                  backgroundColor: '#fff',
+                  cursor: entry.readOnly ? 'default' : 'pointer',
+                  '&:hover': entry.readOnly ? {} : { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+                }}
+              >
+                <Typography variant="body2" sx={{ fontWeight: 500, color: entry.track ? '#1f2937' : '#9ca3af' }}>
+                  {entry.track || 'Track'}
+                </Typography>
+              </Box>
+            )}
+            {editingField === 'raceNumber' ? (
+              <input
+                type="number"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleSaveEdit}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                style={{
+                  width: '50px',
+                  padding: '8px 10px',
+                  fontSize: '0.875rem',
+                  border: '2px solid #3b82f6',
+                  borderRadius: '6px',
+                  backgroundColor: '#fff',
+                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+                }}
+              />
+            ) : (
+              <Box
+                onClick={() => !entry.readOnly && handleStartEdit('raceNumber', entry.raceNumber)}
+                sx={{
+                  px: 1.5,
+                  py: 0.75,
+                  borderRadius: '6px',
+                  border: '1.5px solid #d1d5db',
+                  backgroundColor: '#fff',
+                  cursor: entry.readOnly ? 'default' : 'pointer',
+                  '&:hover': entry.readOnly ? {} : { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+                }}
+              >
+                <Typography variant="body2" sx={{ color: entry.raceNumber ? '#6b7280' : '#9ca3af' }}>
+                  R{entry.raceNumber || '?'}
+                </Typography>
+              </Box>
+            )}
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {outcomeConfig && (
@@ -960,62 +998,83 @@ function MobileTrackerCard({ entry, onUpdate, onRefresh, onDelete, isRefreshing,
         </Box>
 
         {/* Selection row */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 600, color: '#1f2937', minWidth: '24px', cursor: 'pointer' }}
-            onClick={() => !entry.readOnly && handleStartEdit('selectionNumber', entry.selectionNumber)}
-          >
-            {editingField === 'selectionNumber' ? (
-              <input
-                type="number"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={handleSaveEdit}
-                onKeyDown={handleKeyDown}
-                autoFocus
-                style={{
-                  width: '50px',
-                  padding: '8px 10px',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                  border: '2px solid #3b82f6',
-                  borderRadius: '6px',
-                  backgroundColor: '#fff',
-                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
-                }}
-              />
-            ) : (
-              `#${entry.selectionNumber || '?'}`
-            )}
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: '#1f2937', flex: 1, cursor: 'pointer' }}
-            onClick={() => !entry.readOnly && handleStartEdit('selectionName', entry.selectionName)}
-          >
-            {editingField === 'selectionName' ? (
-              <input
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={handleSaveEdit}
-                onKeyDown={handleKeyDown}
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '8px 10px',
-                  fontSize: '0.875rem',
-                  border: '2px solid #3b82f6',
-                  borderRadius: '6px',
-                  backgroundColor: '#fff',
-                  boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
-                }}
-              />
-            ) : (
-              entry.selectionName || 'Selection'
-            )}
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1.5 }}>
+          {editingField === 'selectionNumber' ? (
+            <input
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={handleSaveEdit}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              style={{
+                width: '60px',
+                padding: '8px 10px',
+                fontSize: '0.875rem',
+                fontWeight: 600,
+                border: '2px solid #3b82f6',
+                borderRadius: '6px',
+                backgroundColor: '#fff',
+                boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+              }}
+            />
+          ) : (
+            <Box
+              onClick={() => !entry.readOnly && handleStartEdit('selectionNumber', entry.selectionNumber)}
+              sx={{
+                px: 1.5,
+                py: 0.75,
+                borderRadius: '6px',
+                border: '1.5px solid #d1d5db',
+                backgroundColor: '#fff',
+                minWidth: '48px',
+                textAlign: 'center',
+                cursor: entry.readOnly ? 'default' : 'pointer',
+                '&:hover': entry.readOnly ? {} : { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, color: entry.selectionNumber ? '#1f2937' : '#9ca3af' }}>
+                #{entry.selectionNumber || '?'}
+              </Typography>
+            </Box>
+          )}
+          {editingField === 'selectionName' ? (
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onBlur={handleSaveEdit}
+              onKeyDown={handleKeyDown}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                fontSize: '0.875rem',
+                border: '2px solid #3b82f6',
+                borderRadius: '6px',
+                backgroundColor: '#fff',
+                boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
+              }}
+            />
+          ) : (
+            <Box
+              onClick={() => !entry.readOnly && handleStartEdit('selectionName', entry.selectionName)}
+              sx={{
+                flex: 1,
+                px: 1.5,
+                py: 0.75,
+                borderRadius: '6px',
+                border: '1.5px solid #d1d5db',
+                backgroundColor: '#fff',
+                cursor: entry.readOnly ? 'default' : 'pointer',
+                '&:hover': entry.readOnly ? {} : { borderColor: '#3b82f6', backgroundColor: '#f0f9ff' },
+              }}
+            >
+              <Typography variant="body2" sx={{ color: entry.selectionName ? '#1f2937' : '#9ca3af' }}>
+                {entry.selectionName || 'Horse name'}
+              </Typography>
+            </Box>
+          )}
         </Box>
 
         {/* Bookie row */}

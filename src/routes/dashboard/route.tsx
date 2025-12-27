@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, Link, useLocation } from '@tanstack/react-router'
+import { createFileRoute, Outlet, Link, useLocation, useNavigate } from '@tanstack/react-router'
 import {
   Box,
   Typography,
@@ -16,6 +16,15 @@ import {
   MenuItem,
   Link as MuiLink,
   Collapse,
+  BottomNavigation,
+  BottomNavigationAction,
+  Paper,
+  useTheme,
+  useMediaQuery,
+  Badge,
+  Tooltip,
+  Divider,
+  Popover,
 } from '@mui/material'
 import {
   Dashboard as DashboardIcon,
@@ -27,10 +36,11 @@ import {
   Timeline as TimelineIcon,
   TableChart as TableChartIcon,
 } from '@mui/icons-material'
-import { CircleStar, CalendarDays, BookOpen, Warehouse } from 'lucide-react'
-import { useState } from 'react'
+import { CircleStar, CalendarDays, BookOpen, Warehouse, Home, TrendingUp, CreditCard, Cog, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState, useMemo } from 'react'
 
 const DRAWER_WIDTH = 240
+const DRAWER_WIDTH_COLLAPSED = 64
 const HEADER_HEIGHT = 64
 
 interface NavItem {
@@ -62,11 +72,50 @@ export const Route = createFileRoute('/dashboard')({
   component: DashboardLayout,
 })
 
+// Bottom navigation items for mobile
+const bottomNavItems = [
+  { label: 'Home', icon: <Home size={22} />, path: '/dashboard' },
+  { label: 'Racing', icon: <TrendingUp size={22} />, path: '/dashboard/the-furlong/racing-tracker' },
+  { label: 'Accounts', icon: <CreditCard size={22} />, path: '/dashboard/accounts' },
+  { label: 'Settings', icon: <Cog size={22} />, path: '/dashboard/settings' },
+]
+
 function DashboardLayout() {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({ 'The Furlong': true })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [popoverAnchor, setPopoverAnchor] = useState<{ el: HTMLElement; item: NavItem } | null>(null)
   const location = useLocation()
+  const navigate = useNavigate()
+
+  // Mobile detection
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+
+  // Current drawer width based on collapsed state
+  const currentDrawerWidth = sidebarCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH
+
+  // Popover handlers for collapsed nested menus
+  const handlePopoverOpen = (event: React.MouseEvent<HTMLElement>, item: NavItem) => {
+    if (sidebarCollapsed && item.children) {
+      setPopoverAnchor({ el: event.currentTarget, item })
+    }
+  }
+
+  const handlePopoverClose = () => {
+    setPopoverAnchor(null)
+  }
+
+  // Calculate active bottom nav index based on current path
+  const bottomNavValue = useMemo(() => {
+    const path = location.pathname
+    if (path === '/dashboard') return 0
+    if (path.includes('/the-furlong') || path.includes('/non-promo')) return 1
+    if (path.includes('/accounts')) return 2
+    if (path.includes('/settings')) return 3
+    return 0
+  }, [location.pathname])
 
   const handleProfileClick = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)
@@ -91,61 +140,259 @@ function DashboardLayout() {
     return children.some((child) => location.pathname === child.path)
   }
 
-  const drawer = (
-    <List>
-      {navItems.map((item) => (
-        <Box key={item.text}>
-          {item.children ? (
-            <>
-              <ListItem disablePadding>
-                <ListItemButton
-                  onClick={() => handleMenuToggle(item.text)}
-                  sx={{
-                    backgroundColor: isParentActive(item.children) ? 'action.selected' : 'transparent',
-                  }}
-                >
-                  <ListItemIcon>{item.icon}</ListItemIcon>
-                  <ListItemText primary={item.text} />
-                  {openMenus[item.text] ? <ExpandLess /> : <ExpandMore />}
-                </ListItemButton>
-              </ListItem>
-              <Collapse in={openMenus[item.text]} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
-                  {item.children.map((child) => (
-                    <ListItem key={child.text} disablePadding>
-                      <ListItemButton
-                        component={Link}
-                        to={child.path}
-                        sx={{
-                          pl: 4,
-                          backgroundColor: isActive(child.path) ? 'action.selected' : 'transparent',
-                        }}
-                      >
-                        {child.icon && <ListItemIcon>{child.icon}</ListItemIcon>}
-                        <ListItemText primary={child.text} />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              </Collapse>
-            </>
-          ) : (
-            <ListItem disablePadding>
-              <ListItemButton
-                component={Link}
-                to={item.path!}
+  // Drawer content - adapts to collapsed state
+  const renderDrawerContent = (collapsed: boolean) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Collapse/Expand toggle button at top - only shown on desktop */}
+      {!isMobile && (
+        <>
+          <Box
+            sx={{
+              p: 1.5,
+              display: 'flex',
+              justifyContent: collapsed ? 'center' : 'flex-end',
+              backgroundColor: '#fafafa',
+              borderBottom: '1px solid #e5e7eb',
+            }}
+          >
+            <Tooltip title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right" arrow>
+              <IconButton
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                size="medium"
                 sx={{
-                  backgroundColor: isActive(item.path!) ? 'action.selected' : 'transparent',
+                  backgroundColor: '#fff',
+                  border: '1.5px solid #d1d5db',
+                  borderRadius: '8px',
+                  width: collapsed ? 40 : 36,
+                  height: 36,
+                  '&:hover': {
+                    backgroundColor: '#f0f9ff',
+                    borderColor: '#3b82f6',
+                  },
                 }}
               >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                <ListItemText primary={item.text} />
-              </ListItemButton>
-            </ListItem>
-          )}
-        </Box>
-      ))}
-    </List>
+                {collapsed ? <ChevronRight size={20} /> : <ChevronLeft size={20} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        </>
+      )}
+      <List sx={{ flexGrow: 1, pt: 1 }}>
+        {navItems.map((item) => (
+          <Box key={item.text}>
+            {item.children ? (
+              <>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (collapsed) {
+                        setPopoverAnchor({ el: e.currentTarget, item })
+                      } else {
+                        handleMenuToggle(item.text)
+                      }
+                    }}
+                    sx={{
+                      backgroundColor: isParentActive(item.children) ? 'action.selected' : 'transparent',
+                      minHeight: 48,
+                      justifyContent: collapsed ? 'center' : 'initial',
+                      px: collapsed ? 2 : 2.5,
+                      '&:hover': {
+                        backgroundColor: collapsed ? 'action.hover' : undefined,
+                      },
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 0,
+                        mr: collapsed ? 0 : 2,
+                        justifyContent: 'center',
+                        color: isParentActive(item.children) ? 'primary.main' : 'inherit',
+                      }}
+                    >
+                      {item.icon}
+                    </ListItemIcon>
+                    {!collapsed && (
+                      <>
+                        <ListItemText primary={item.text} />
+                        {openMenus[item.text] ? <ExpandLess /> : <ExpandMore />}
+                      </>
+                    )}
+                  </ListItemButton>
+                </ListItem>
+                {!collapsed && (
+                  <Collapse in={openMenus[item.text]} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      {item.children.map((child) => (
+                        <ListItem key={child.text} disablePadding>
+                          <ListItemButton
+                            component={Link}
+                            to={child.path}
+                            sx={{
+                              pl: 4,
+                              backgroundColor: isActive(child.path) ? 'action.selected' : 'transparent',
+                              minHeight: 44,
+                            }}
+                          >
+                            {child.icon && (
+                              <ListItemIcon
+                                sx={{
+                                  minWidth: 0,
+                                  mr: 2,
+                                  color: isActive(child.path) ? 'primary.main' : 'inherit',
+                                }}
+                              >
+                                {child.icon}
+                              </ListItemIcon>
+                            )}
+                            <ListItemText
+                              primary={child.text}
+                              primaryTypographyProps={{
+                                fontSize: '0.875rem',
+                                fontWeight: isActive(child.path) ? 600 : 400,
+                              }}
+                            />
+                          </ListItemButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Collapse>
+                )}
+              </>
+            ) : (
+              <ListItem disablePadding>
+                <Tooltip title={collapsed ? item.text : ''} placement="right" arrow>
+                  <ListItemButton
+                    component={Link}
+                    to={item.path!}
+                    sx={{
+                      backgroundColor: isActive(item.path!) ? 'action.selected' : 'transparent',
+                      minHeight: 48,
+                      justifyContent: collapsed ? 'center' : 'initial',
+                      px: collapsed ? 2 : 2.5,
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 0,
+                        mr: collapsed ? 0 : 2,
+                        justifyContent: 'center',
+                        color: isActive(item.path!) ? 'primary.main' : 'inherit',
+                      }}
+                    >
+                      {item.icon}
+                    </ListItemIcon>
+                    {!collapsed && <ListItemText primary={item.text} />}
+                  </ListItemButton>
+                </Tooltip>
+              </ListItem>
+            )}
+          </Box>
+        ))}
+      </List>
+
+    </Box>
+  )
+
+  // Mobile drawer - no collapse button needed
+  const mobileDrawer = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <List sx={{ flexGrow: 1, pt: 1 }}>
+        {navItems.map((item) => (
+          <Box key={item.text}>
+            {item.children ? (
+              <>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    onClick={() => handleMenuToggle(item.text)}
+                    sx={{
+                      backgroundColor: isParentActive(item.children) ? 'action.selected' : 'transparent',
+                      minHeight: 48,
+                      px: 2.5,
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={{
+                        minWidth: 0,
+                        mr: 2,
+                        justifyContent: 'center',
+                        color: isParentActive(item.children) ? 'primary.main' : 'inherit',
+                      }}
+                    >
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText primary={item.text} />
+                    {openMenus[item.text] ? <ExpandLess /> : <ExpandMore />}
+                  </ListItemButton>
+                </ListItem>
+                <Collapse in={openMenus[item.text]} timeout="auto" unmountOnExit>
+                  <List component="div" disablePadding>
+                    {item.children.map((child) => (
+                      <ListItem key={child.text} disablePadding>
+                        <ListItemButton
+                          component={Link}
+                          to={child.path}
+                          onClick={() => setMobileOpen(false)}
+                          sx={{
+                            pl: 4,
+                            backgroundColor: isActive(child.path) ? 'action.selected' : 'transparent',
+                            minHeight: 44,
+                          }}
+                        >
+                          {child.icon && (
+                            <ListItemIcon
+                              sx={{
+                                minWidth: 0,
+                                mr: 2,
+                                color: isActive(child.path) ? 'primary.main' : 'inherit',
+                              }}
+                            >
+                              {child.icon}
+                            </ListItemIcon>
+                          )}
+                          <ListItemText
+                            primary={child.text}
+                            primaryTypographyProps={{
+                              fontSize: '0.875rem',
+                              fontWeight: isActive(child.path) ? 600 : 400,
+                            }}
+                          />
+                        </ListItemButton>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Collapse>
+              </>
+            ) : (
+              <ListItem disablePadding>
+                <ListItemButton
+                  component={Link}
+                  to={item.path!}
+                  onClick={() => setMobileOpen(false)}
+                  sx={{
+                    backgroundColor: isActive(item.path!) ? 'action.selected' : 'transparent',
+                    minHeight: 48,
+                    px: 2.5,
+                  }}
+                >
+                  <ListItemIcon
+                    sx={{
+                      minWidth: 0,
+                      mr: 2,
+                      justifyContent: 'center',
+                      color: isActive(item.path!) ? 'primary.main' : 'inherit',
+                    }}
+                  >
+                    {item.icon}
+                  </ListItemIcon>
+                  <ListItemText primary={item.text} />
+                </ListItemButton>
+              </ListItem>
+            )}
+          </Box>
+        ))}
+      </List>
+    </Box>
   )
 
   return (
@@ -210,7 +457,7 @@ function DashboardLayout() {
           },
         }}
       >
-        {drawer}
+        {mobileDrawer}
       </Drawer>
       <Drawer
         variant="permanent"
@@ -218,40 +465,177 @@ function DashboardLayout() {
           display: { xs: 'none', md: 'block' },
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
-            width: DRAWER_WIDTH,
+            width: currentDrawerWidth,
             top: HEADER_HEIGHT,
             height: `calc(100% - ${HEADER_HEIGHT}px)`,
+            transition: 'width 0.2s ease-in-out',
+            overflowX: 'hidden',
           },
         }}
         open
       >
-        {drawer}
+        {renderDrawerContent(sidebarCollapsed)}
       </Drawer>
+
+      {/* Popover for collapsed sidebar nested menus */}
+      <Popover
+        open={Boolean(popoverAnchor)}
+        anchorEl={popoverAnchor?.el}
+        onClose={handlePopoverClose}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'right',
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        sx={{
+          '& .MuiPopover-paper': {
+            ml: 1,
+            minWidth: 200,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+            borderRadius: 2,
+          },
+        }}
+      >
+        {popoverAnchor?.item.children && (
+          <Box sx={{ py: 1 }}>
+            <Typography
+              sx={{
+                px: 2,
+                py: 1,
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                color: 'text.secondary',
+                letterSpacing: '0.05em',
+              }}
+            >
+              {popoverAnchor.item.text}
+            </Typography>
+            <List disablePadding>
+              {popoverAnchor.item.children.map((child) => (
+                <ListItem key={child.text} disablePadding>
+                  <ListItemButton
+                    component={Link}
+                    to={child.path}
+                    onClick={handlePopoverClose}
+                    sx={{
+                      py: 1,
+                      px: 2,
+                      backgroundColor: isActive(child.path) ? 'action.selected' : 'transparent',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                      },
+                    }}
+                  >
+                    {child.icon && (
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 0,
+                          mr: 1.5,
+                          color: isActive(child.path) ? 'primary.main' : 'inherit',
+                        }}
+                      >
+                        {child.icon}
+                      </ListItemIcon>
+                    )}
+                    <ListItemText
+                      primary={child.text}
+                      primaryTypographyProps={{
+                        fontSize: '0.875rem',
+                        fontWeight: isActive(child.path) ? 600 : 400,
+                      }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        )}
+      </Popover>
 
       {/* Main Content Area */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          ml: { md: `${DRAWER_WIDTH}px` },
+          ml: { md: `${currentDrawerWidth}px` },
           mt: `${HEADER_HEIGHT}px`,
-          p: 3,
+          p: { xs: 2, md: 3 },
+          pb: { xs: '80px', md: 3 }, // Extra bottom padding on mobile for bottom nav
           minHeight: `calc(100vh - ${HEADER_HEIGHT}px - 48px)`,
+          transition: 'margin-left 0.2s ease-in-out',
         }}
       >
         <Outlet />
       </Box>
 
-      {/* Footer */}
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <Paper
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1100,
+            borderTop: '1px solid #e5e7eb',
+            pb: 'env(safe-area-inset-bottom)', // iOS safe area
+          }}
+          elevation={3}
+        >
+          <BottomNavigation
+            value={bottomNavValue}
+            onChange={(_, newValue) => {
+              navigate({ to: bottomNavItems[newValue].path })
+            }}
+            showLabels
+            sx={{
+              height: 64,
+              '& .MuiBottomNavigationAction-root': {
+                minWidth: 70,
+                py: 1,
+                '&.Mui-selected': {
+                  color: '#3b82f6',
+                },
+              },
+              '& .MuiBottomNavigationAction-label': {
+                fontSize: '0.7rem',
+                fontWeight: 500,
+                mt: 0.5,
+                '&.Mui-selected': {
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                },
+              },
+            }}
+          >
+            {bottomNavItems.map((item) => (
+              <BottomNavigationAction
+                key={item.label}
+                label={item.label}
+                icon={item.icon}
+                sx={{ color: '#6b7280' }}
+              />
+            ))}
+          </BottomNavigation>
+        </Paper>
+      )}
+
+      {/* Footer - Hidden on mobile */}
       <Box
         component="footer"
         sx={{
-          ml: { md: `${DRAWER_WIDTH}px` },
+          display: { xs: 'none', md: 'block' },
+          ml: { md: `${currentDrawerWidth}px` },
           py: 1.5,
           px: 3,
           backgroundColor: 'white',
           borderTop: '1px solid',
           borderColor: 'divider',
+          transition: 'margin-left 0.2s ease-in-out',
         }}
       >
         <Box className="flex justify-between items-center">

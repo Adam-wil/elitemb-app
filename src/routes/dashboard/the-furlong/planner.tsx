@@ -22,8 +22,10 @@ import {
   Divider,
   Badge,
   CircularProgress,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material'
-import { Archive, RotateCcw, Trash2, Lock, HelpCircle } from 'lucide-react'
+import { Archive, RotateCcw, Trash2, Lock, HelpCircle, Calendar } from 'lucide-react'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
   ImportButton,
@@ -32,6 +34,8 @@ import {
   TimezoneSelector,
   useTimezone,
   LockInDialog,
+  MobileCalendarDrawer,
+  MobilePlannerBottomNav,
   DEFAULT_STATE_COMMISSIONS,
   parseRacingPlanExcel,
   getSupportedDateFormats,
@@ -84,6 +88,12 @@ function PlannerPage() {
   // Lock-in state
   const [selectedEntryIds, setSelectedEntryIds] = useState<string[]>([])
   const [lockInDialogOpen, setLockInDialogOpen] = useState(false)
+
+  // Mobile detection and state
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
+  const [mobileCalendarOpen, setMobileCalendarOpen] = useState(false)
+  const mobileFileInputRef = useRef<HTMLInputElement>(null)
 
   // Load archived dates on mount
   useEffect(() => {
@@ -358,9 +368,29 @@ function PlannerPage() {
     navigate({ to: '/dashboard/the-furlong/racing-tracker' })
   }
 
+  // Mobile file input handler
+  const handleMobileFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      await handleFileSelect(file)
+    }
+    // Reset input so same file can be selected again
+    event.target.value = ''
+  }
+
+  const handleMobileImportClick = () => {
+    mobileFileInputRef.current?.click()
+  }
+
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      // Add bottom padding on mobile for bottom navigation
+      pb: isMobile ? '80px' : 0,
+    }}>
+      <Typography variant="h5" sx={{ fontWeight: 600, mb: isMobile ? 2 : 3 }}>
         Planner
       </Typography>
 
@@ -371,88 +401,147 @@ function PlannerPage() {
       )}
 
       <Box sx={{ display: 'flex', gap: 2, flexGrow: 1, minHeight: 0 }}>
-        {/* Calendar Section - Horizontal Collapsible */}
-        <Box sx={{ flexShrink: 0 }}>
-          <PlannerCalendar
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
-            datesWithPlans={datesWithPlans}
-            expanded={calendarExpanded}
-            onToggleExpand={handleToggleCalendar}
-          />
-        </Box>
+        {/* Calendar Section - Desktop only, Horizontal Collapsible */}
+        {!isMobile && (
+          <Box sx={{ flexShrink: 0 }}>
+            <PlannerCalendar
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              datesWithPlans={datesWithPlans}
+              expanded={calendarExpanded}
+              onToggleExpand={handleToggleCalendar}
+            />
+          </Box>
+        )}
 
         {/* Data Grid Section - Expands to fill available space */}
         <Box sx={{ flexGrow: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <Paper sx={{ p: 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 500 }}>
-                {selectedDateDisplay}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Paper sx={{ p: isMobile ? 1.5 : 2, flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+            {/* Header - Different layout for mobile vs desktop */}
+            <Box sx={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              mb: 2,
+              flexWrap: isMobile ? 'wrap' : 'nowrap',
+              gap: isMobile ? 1 : 0,
+            }}>
+              {/* Date display with calendar button on mobile */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {isMobile && (
+                  <Button
+                    onClick={() => setMobileCalendarOpen(true)}
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Calendar size={16} />}
+                    sx={{
+                      borderColor: '#d1d5db',
+                      color: '#374151',
+                      backgroundColor: '#fff',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: '0.875rem',
+                      px: 1.5,
+                      py: 0.75,
+                      borderRadius: 1.5,
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                      '&:hover': {
+                        backgroundColor: '#f9fafb',
+                        borderColor: '#3b82f6',
+                      },
+                      '&:active': {
+                        backgroundColor: '#eff6ff',
+                      },
+                    }}
+                  >
+                    {selectedDate?.format('ddd, MMM D')}
+                  </Button>
+                )}
+                {!isMobile && (
+                  <Typography variant="h6" sx={{ fontWeight: 500 }}>
+                    {selectedDateDisplay}
+                  </Typography>
+                )}
+              </Box>
+
+              {/* Desktop toolbar */}
+              {!isMobile && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <TimezoneSelector
+                    selectedDate={selectedDateStr}
+                    value={timezone}
+                    onChange={setTimezone}
+                  />
+
+                  {/* Lock-In Button */}
+                  <Tooltip title={selectedEntryIds.length > 0 ? `Lock in ${selectedEntryIds.length} race(s)` : 'Select races to lock in'}>
+                    <span>
+                      <Badge badgeContent={selectedEntryIds.length} color="primary">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<Lock size={16} />}
+                          onClick={handleLockInClick}
+                          disabled={selectedEntryIds.length === 0}
+                        >
+                          Lock In
+                        </Button>
+                      </Badge>
+                    </span>
+                  </Tooltip>
+
+                  <Tooltip title="Archive options">
+                    <IconButton
+                      onClick={handleArchiveClick}
+                      sx={{
+                        color: currentDateHasArchive ? 'primary.main' : 'text.secondary',
+                      }}
+                    >
+                      <Archive size={20} />
+                    </IconButton>
+                  </Tooltip>
+                  <ImportButton onFileSelect={handleFileSelect} loading={loading} />
+                </Box>
+              )}
+
+              {/* Mobile timezone selector - compact */}
+              {isMobile && (
                 <TimezoneSelector
                   selectedDate={selectedDateStr}
                   value={timezone}
                   onChange={setTimezone}
                 />
-
-                {/* Lock-In Button */}
-                <Tooltip title={selectedEntryIds.length > 0 ? `Lock in ${selectedEntryIds.length} race(s)` : 'Select races to lock in'}>
-                  <span>
-                    <Badge badgeContent={selectedEntryIds.length} color="primary">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<Lock size={16} />}
-                        onClick={handleLockInClick}
-                        disabled={selectedEntryIds.length === 0}
-                      >
-                        Lock In
-                      </Button>
-                    </Badge>
-                  </span>
-                </Tooltip>
-
-                <Tooltip title="Archive options">
-                  <IconButton
-                    onClick={handleArchiveClick}
-                    sx={{
-                      color: currentDateHasArchive ? 'primary.main' : 'text.secondary',
-                    }}
-                  >
-                    <Archive size={20} />
-                  </IconButton>
-                </Tooltip>
-                <Menu
-                  anchorEl={archiveMenuAnchor}
-                  open={Boolean(archiveMenuAnchor)}
-                  onClose={handleArchiveMenuClose}
-                >
-                  <MenuItem onClick={handleArchivePlan} disabled={!currentDateHasPlan}>
-                    <ListItemIcon>
-                      <Archive size={18} />
-                    </ListItemIcon>
-                    <ListItemText>
-                      {currentDateHasArchive ? 'Update Archive' : 'Archive Plan'}
-                    </ListItemText>
-                  </MenuItem>
-                  <MenuItem onClick={handleRestorePlan} disabled={!currentDateHasArchive}>
-                    <ListItemIcon>
-                      <RotateCcw size={18} />
-                    </ListItemIcon>
-                    <ListItemText>Restore from Archive</ListItemText>
-                  </MenuItem>
-                  <Divider />
-                  <MenuItem onClick={handleDeleteArchive} disabled={!currentDateHasArchive}>
-                    <ListItemIcon>
-                      <Trash2 size={18} color="#d32f2f" />
-                    </ListItemIcon>
-                    <ListItemText sx={{ color: 'error.main' }}>Delete Archive</ListItemText>
-                  </MenuItem>
-                </Menu>
-                <ImportButton onFileSelect={handleFileSelect} loading={loading} />
-              </Box>
+              )}
             </Box>
+
+            {/* Archive Menu - shared between mobile and desktop */}
+            <Menu
+              anchorEl={archiveMenuAnchor}
+              open={Boolean(archiveMenuAnchor)}
+              onClose={handleArchiveMenuClose}
+            >
+              <MenuItem onClick={handleArchivePlan} disabled={!currentDateHasPlan}>
+                <ListItemIcon>
+                  <Archive size={18} />
+                </ListItemIcon>
+                <ListItemText>
+                  {currentDateHasArchive ? 'Update Archive' : 'Archive Plan'}
+                </ListItemText>
+              </MenuItem>
+              <MenuItem onClick={handleRestorePlan} disabled={!currentDateHasArchive}>
+                <ListItemIcon>
+                  <RotateCcw size={18} />
+                </ListItemIcon>
+                <ListItemText>Restore from Archive</ListItemText>
+              </MenuItem>
+              <Divider />
+              <MenuItem onClick={handleDeleteArchive} disabled={!currentDateHasArchive}>
+                <ListItemIcon>
+                  <Trash2 size={18} color="#d32f2f" />
+                </ListItemIcon>
+                <ListItemText sx={{ color: 'error.main' }}>Delete Archive</ListItemText>
+              </MenuItem>
+            </Menu>
 
             <Box sx={{ flexGrow: 1, position: 'relative' }}>
               <RacingPlanDataGrid
@@ -495,6 +584,40 @@ function PlannerPage() {
           </Paper>
         </Box>
       </Box>
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <MobilePlannerBottomNav
+          onCalendarOpen={() => setMobileCalendarOpen(true)}
+          onLockInClick={handleLockInClick}
+          onArchiveClick={handleArchiveClick}
+          onImportClick={handleMobileImportClick}
+          selectedCount={selectedEntryIds.length}
+          hasArchive={currentDateHasArchive}
+          loading={loading}
+        />
+      )}
+
+      {/* Mobile Calendar Drawer */}
+      {isMobile && (
+        <MobileCalendarDrawer
+          open={mobileCalendarOpen}
+          onClose={() => setMobileCalendarOpen(false)}
+          onOpen={() => setMobileCalendarOpen(true)}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
+          datesWithPlans={datesWithPlans}
+        />
+      )}
+
+      {/* Hidden file input for mobile import */}
+      <input
+        type="file"
+        ref={mobileFileInputRef}
+        style={{ display: 'none' }}
+        accept=".xlsx,.xls"
+        onChange={handleMobileFileChange}
+      />
 
       {/* Bet Back Column Validation Dialog */}
       <Dialog open={betBackColumnDialog} onClose={handleBetBackColumnCancel}>
