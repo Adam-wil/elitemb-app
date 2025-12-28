@@ -13,7 +13,7 @@ import {
   Chip,
   Alert,
 } from '@mui/material'
-import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft, HeartPulse } from 'lucide-react'
+import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft, HeartPulse, BookOpen } from 'lucide-react'
 import { useBasiqConnection } from '../hooks/useBasiqConnection'
 import { useTransactions, getDefaultDateRange } from '../hooks/useTransactions'
 import { useBonusCredits } from '../hooks/useBonusCredits'
@@ -22,6 +22,7 @@ import { BankAccountsTab } from './BankAccountsTab'
 import { RacingPLTab } from './RacingPLTab'
 import { ConnectionSetup } from './ConnectionSetup'
 import { BookieHealthTab } from './BookieHealthTab'
+import { LedgerTab } from './ledger'
 
 // ============================================================================
 // Types
@@ -147,12 +148,13 @@ export function AccountsDashboard() {
         </Box>
       </Box>
 
-      {/* Connection Banner */}
+      {/* Connection Banner - hidden on mobile */}
       {!isConnected && (
         <Alert
           severity="info"
           sx={{
             mb: 3,
+            display: { xs: 'none', sm: 'flex' },
             backgroundColor: 'transparent',
             border: '1px solid',
             borderColor: 'divider',
@@ -172,7 +174,14 @@ export function AccountsDashboard() {
       )}
 
       {/* Summary Cards */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+          gap: 2,
+          mb: 3,
+        }}
+      >
         <SummaryCard
           title="Total Profit"
           value={`$${totalProfit.toFixed(2)}`}
@@ -203,29 +212,58 @@ export function AccountsDashboard() {
       {/* Tabs */}
       <Paper sx={{ borderRadius: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange}>
+          <Tabs
+            value={tabValue}
+            onChange={handleTabChange}
+            variant="fullWidth"
+            sx={{
+              minHeight: { xs: 40, sm: 48 },
+              '& .MuiTab-root': {
+                minHeight: { xs: 40, sm: 48 },
+                minWidth: 0,
+                px: { xs: 0.5, sm: 2 },
+                fontSize: { xs: '0.7rem', sm: '0.875rem' },
+                textTransform: 'none',
+                fontWeight: 500,
+              },
+              '& .MuiTabs-indicator': {
+                height: 3,
+                borderRadius: '3px 3px 0 0',
+              },
+            }}
+          >
             <Tab
               label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  Bank Accounts
-                  <Chip label={transactions.length} size="small" />
-                </Box>
+                <>
+                  <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+                    Bank Accounts
+                    <Chip label={transactions.length} size="small" />
+                  </Box>
+                  <Box sx={{ display: { xs: 'block', sm: 'none' } }}>Bank</Box>
+                </>
+              }
+            />
+            <Tab label="Ledger" />
+            <Tab
+              label={
+                <>
+                  <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+                    Racing P&L
+                    <Chip label={plRows.length} size="small" />
+                  </Box>
+                  <Box sx={{ display: { xs: 'block', sm: 'none' } }}>P&L</Box>
+                </>
               }
             />
             <Tab
               label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  Racing P&L
-                  <Chip label={plRows.length} size="small" />
-                </Box>
-              }
-            />
-            <Tab
-              label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <HeartPulse size={16} />
-                  Bookie Health
-                </Box>
+                <>
+                  <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
+                    <HeartPulse size={16} />
+                    Bookie Health
+                  </Box>
+                  <Box sx={{ display: { xs: 'block', sm: 'none' } }}>Health</Box>
+                </>
               }
             />
           </Tabs>
@@ -245,6 +283,9 @@ export function AccountsDashboard() {
             />
           </TabPanel>
           <TabPanel value={tabValue} index={1}>
+            <LedgerTab />
+          </TabPanel>
+          <TabPanel value={tabValue} index={2}>
             <RacingPLTab
               plRows={plRows}
               totalProfit={totalProfit}
@@ -257,7 +298,7 @@ export function AccountsDashboard() {
               onClearOverride={clearOverride}
             />
           </TabPanel>
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel value={tabValue} index={3}>
             <BookieHealthTab />
           </TabPanel>
         </Box>
@@ -301,10 +342,10 @@ function SummaryCard({ title, value, icon, color, subtitle }: SummaryCardProps) 
     <Paper
       sx={{
         p: 2,
-        flex: 1,
         backgroundColor: colors.bg,
         border: 'none',
         boxShadow: 'none',
+        minWidth: 0,
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
