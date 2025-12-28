@@ -17,7 +17,7 @@ import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft, HeartPul
 import { useBasiqConnection } from '../hooks/useBasiqConnection'
 import { useTransactions, getDefaultDateRange } from '../hooks/useTransactions'
 import { useBonusCredits } from '../hooks/useBonusCredits'
-import { useBookieBalances } from '../hooks/useBookieBalances'
+import { useBookiePL } from '../hooks/useBookiePL'
 import { BankAccountsTab } from './BankAccountsTab'
 import { RacingPLTab } from './RacingPLTab'
 import { ConnectionSetup } from './ConnectionSetup'
@@ -75,6 +75,7 @@ export function AccountsDashboard() {
 
   const { bonusCredits, addCredit, removeCredit, getGrandTotal } = useBonusCredits()
 
+  // P&L data from database (not calculated from transactions)
   const {
     plRows,
     totalProfit,
@@ -82,10 +83,9 @@ export function AccountsDashboard() {
     totalBonusBalance,
     setOverride,
     clearOverride,
-  } = useBookieBalances({
-    transactions,
-    bonusCredits,
-  })
+    refresh: refreshPL,
+    isLoading: plLoading,
+  } = useBookiePL()
 
   // Handlers
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -93,16 +93,19 @@ export function AccountsDashboard() {
   }
 
   const handleRefresh = useCallback(async () => {
-    await refreshAccounts()
-    await refreshTransactions()
-  }, [refreshAccounts, refreshTransactions])
+    await Promise.all([
+      refreshAccounts(),
+      refreshTransactions(),
+      refreshPL(),
+    ])
+  }, [refreshAccounts, refreshTransactions, refreshPL])
 
   const handleSetupComplete = useCallback(() => {
     setShowSetup(false)
     handleRefresh()
   }, [handleRefresh])
 
-  const isLoading = connectionLoading || transactionsLoading
+  const isLoading = connectionLoading || transactionsLoading || plLoading
 
   // Show setup wizard if requested
   if (showSetup) {
