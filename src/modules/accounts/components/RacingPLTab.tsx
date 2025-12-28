@@ -51,8 +51,8 @@ interface RacingPLTabProps {
     amount: number
     date: string
     notes: string
-  }) => void
-  onRemoveBonusCredit: (id: string) => void
+  }) => void | Promise<unknown>
+  onRemoveBonusCredit: (id: string) => void | Promise<boolean>
   onSetOverride: (bookieId: string, value: number, reason?: string) => void
   onClearOverride: (bookieId: string) => void
 }

@@ -591,6 +591,55 @@ export const recalculateBalance = createServerFn({ method: 'POST' })
 // ============================================================================
 
 /**
+ * Delete ledger entry by bonus credit ID
+ */
+export const deleteLedgerEntryByBonusCreditId = createServerFn({ method: 'POST' })
+  .inputValidator((input: { bonusCreditId: string }) => input)
+  .handler(async ({ data }: { data: { bonusCreditId: string } }): Promise<{ deleted: boolean }> => {
+    const profileId = await getDefaultProfileId()
+
+    // Find the entry
+    const entry = await prisma.accountLedger.findFirst({
+      where: {
+        profileId,
+        bonusCreditId: data.bonusCreditId,
+      },
+    })
+
+    if (!entry) {
+      return { deleted: false }
+    }
+
+    // Get the bookie name for balance update
+    const bookieName = entry.bookieName
+    const amount = typeof entry.amount === 'number' ? entry.amount : entry.amount.toNumber()
+    const balanceEffect = entry.direction === 'in' ? -amount : amount // Reverse the effect
+
+    // Delete the entry
+    await prisma.accountLedger.delete({
+      where: { id: entry.id },
+    })
+
+    // Update the account balance
+    await prisma.accountBalance.update({
+      where: {
+        profileId_bookieName: {
+          profileId,
+          bookieName,
+        },
+      },
+      data: {
+        currentBalance: {
+          increment: balanceEffect,
+        },
+        lastUpdated: new Date(),
+      },
+    })
+
+    return { deleted: true }
+  })
+
+/**
  * Adjust balance manually (creates an ADJUSTMENT entry)
  */
 export const adjustBalance = createServerFn({ method: 'POST' })
