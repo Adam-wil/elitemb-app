@@ -29,6 +29,8 @@ model Profile {
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   planEntries          RacingPlanEntry[]
   trackerEntries       RacingTrackerEntry[]
+  accountLedgerEntries AccountLedger[]
+  accountBalances      AccountBalance[]
 
   @@index([userId])
 }
@@ -60,6 +62,8 @@ model Bookie {
   updatedAt           DateTime            @updatedAt
   bookieNotes         BookieNote[]
   ratioConfigs        BookieRatioConfig[]
+  ledgerEntries       AccountLedger[]
+  accountBalances     AccountBalance[]
 }
 
 /// State commission rates for Betfair based on track location
@@ -339,4 +343,91 @@ model BookieRatioConfig {
   @@unique([profileId, bookieId])
   @@index([profileId])
   @@index([status])
+}
+
+// ============================================================================
+// Account Ledger - Financial tracking for bookie/exchange accounts
+// ============================================================================
+
+enum LedgerEntryType {
+  DEPOSIT         // Money sent TO bookie/exchange
+  WITHDRAWAL      // Money received FROM bookie/exchange
+  BET_WIN         // Winning bet P&L (from tracker)
+  BET_LOSS        // Losing bet P&L (from tracker)
+  BONUS_CREDIT    // Bonus received
+  BONUS_TURNOVER  // Bonus wagering result
+  ADJUSTMENT      // Manual balance adjustment
+  COMMISSION      // Exchange commission
+  REFUND          // Bet refund
+}
+
+/// Account Ledger Entry - Individual transaction in the ledger
+/// Creates an audit trail of all balance-affecting transactions
+model AccountLedger {
+  id                String           @id @default(uuid())
+  profileId         String
+  bookieId          Int?             // Null for exchange entries or generic
+  bookieName        String           // Denormalized for display
+  isExchange        Boolean          @default(false)
+
+  entryType         LedgerEntryType
+  amount            Decimal          @db.Decimal(10, 2) // Always positive
+  direction         String           // 'in' or 'out' relative to bookie balance
+  runningBalance    Decimal          @db.Decimal(10, 2) // Balance after this entry
+
+  date              DateTime
+  description       String?
+  notes             String?          // User notes for adjustments
+
+  // Linking to source data
+  bankTransactionId String?          // If from Basiq bank transaction
+  trackerEntryId    String?          // If from racing tracker entry
+  layManagerEntryId String?          // If from lay manager entry
+  bonusCreditId     String?          // If bonus-related
+
+  // Reconciliation
+  isReconciled      Boolean          @default(false)
+  reconciledAt      DateTime?
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookie            Bookie?          @relation(fields: [bookieId], references: [id])
+
+  @@index([profileId, bookieName])
+  @@index([profileId, date])
+  @@index([bankTransactionId])
+  @@index([trackerEntryId])
+  @@index([layManagerEntryId])
+  @@index([entryType])
+}
+
+/// Account Balance - Current balance per bookie/exchange
+/// Stores the computed balance for quick access
+model AccountBalance {
+  id                String           @id @default(uuid())
+  profileId         String
+  bookieId          Int?
+  bookieName        String
+  isExchange        Boolean          @default(false)
+
+  currentBalance    Decimal          @default(0) @db.Decimal(10, 2)
+  totalPL           Decimal          @default(0) @db.Decimal(10, 2) // Sum of BET_WIN + BET_LOSS only
+  lastUpdated       DateTime         @default(now())
+
+  // Manual override
+  isOverridden      Boolean          @default(false)
+  overrideValue     Decimal?         @db.Decimal(10, 2)
+  overrideReason    String?
+  overrideAt        DateTime?
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  bookie            Bookie?          @relation(fields: [bookieId], references: [id])
+
+  @@unique([profileId, bookieName])
+  @@index([profileId])
 }

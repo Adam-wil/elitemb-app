@@ -2,8 +2,11 @@
  * Accounts Module Types
  *
  * Types for Basiq banking integration, transaction processing,
- * bookie detection, and P&L calculation.
+ * bookie detection, P&L calculation, and account ledger.
  */
+
+// Re-export ledger types
+export * from './ledger'
 
 // ============================================================================
 // Basiq API Types
