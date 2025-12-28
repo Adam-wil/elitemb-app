@@ -9,7 +9,7 @@ interface TimePeriodSelectorProps {
   onChange: (period: TimePeriod) => void
 }
 
-const PERIODS: TimePeriod[] = ['week', 'month', 'quarter', 'year']
+const PERIODS: TimePeriod[] = ['week', 'month', 'quarter', 'year', 'all']
 
 export function TimePeriodSelector({ value, onChange }: TimePeriodSelectorProps) {
   const theme = useTheme()

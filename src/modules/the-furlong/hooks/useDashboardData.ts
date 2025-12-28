@@ -17,6 +17,7 @@ import type {
 import { createDefaultMetrics } from '../types'
 import type { TrackedRaceEntry, DailyTrackerData } from '../types'
 import { getTrackerData, getDatesWithTrackerData, getArchivedTrackerDays } from '../utils/trackerStorage'
+import { calculateProfitLoss } from '../utils/outcomeLogic'
 import { getAllBonuses } from '../../the-stable/utils/bonusStorage'
 import type { Bonus } from '../../the-stable/types'
 
@@ -50,6 +51,12 @@ function getDateRangeForPeriod(period: TimePeriod): DateRange {
       return {
         start: now.startOf('year').format('YYYY-MM-DD'),
         end: now.endOf('year').format('YYYY-MM-DD'),
+      }
+    case 'all':
+      // Very wide range to capture all data
+      return {
+        start: '2020-01-01',
+        end: '2099-12-31',
       }
   }
 }
@@ -108,9 +115,10 @@ function calculateMetrics(entries: TrackedRaceEntry[], bonuses: Bonus[]): Dashbo
     (e) => e.outcome !== 'Pending' && e.outcome !== 'Scratched'
   )
 
-  // Calculate profit metrics
+  // Calculate profit metrics (recalculate P&L to ensure latest logic is used)
   for (const entry of completed) {
-    const pnl = entry.profitLoss || 0
+    // Recalculate P&L on the fly instead of using stored value
+    const pnl = calculateProfitLoss(entry)
     if (pnl > 0) {
       metrics.grossProfit += pnl
     }
@@ -196,7 +204,7 @@ function generateChartData(
 
         data.push({
           label: current.format('ddd'),
-          profit: completed.reduce((sum, e) => sum + (e.profitLoss || 0), 0),
+          profit: completed.reduce((sum, e) => sum + calculateProfitLoss(e), 0),
           outlay: dayEntries.reduce((sum, e) => sum + (e.backBet?.stake || 0), 0),
           races: completed.length,
           startDate: dateStr,
@@ -230,7 +238,7 @@ function generateChartData(
         if (weekEnd.format('YYYY-MM-DD') >= range.start) {
           data.push({
             label: `W${weekNum}`,
-            profit: completed.reduce((sum, e) => sum + (e.profitLoss || 0), 0),
+            profit: completed.reduce((sum, e) => sum + calculateProfitLoss(e), 0),
             outlay: weekEntries.reduce((sum, e) => sum + (e.backBet?.stake || 0), 0),
             races: completed.length,
             startDate: startStr,
@@ -266,7 +274,7 @@ function generateChartData(
 
         data.push({
           label: monthStart.format('MMM'),
-          profit: completed.reduce((sum, e) => sum + (e.profitLoss || 0), 0),
+          profit: completed.reduce((sum, e) => sum + calculateProfitLoss(e), 0),
           outlay: monthEntries.reduce((sum, e) => sum + (e.backBet?.stake || 0), 0),
           races: completed.length,
           startDate: startStr,
@@ -297,12 +305,53 @@ function generateChartData(
 
         data.push({
           label: monthStart.format('MMM'),
-          profit: completed.reduce((sum, e) => sum + (e.profitLoss || 0), 0),
+          profit: completed.reduce((sum, e) => sum + calculateProfitLoss(e), 0),
           outlay: monthEntries.reduce((sum, e) => sum + (e.backBet?.stake || 0), 0),
           races: completed.length,
           startDate: startStr,
           endDate: endStr,
         })
+
+        monthStart = monthStart.add(1, 'month').startOf('month')
+      }
+      break
+    }
+
+    case 'all': {
+      // Monthly breakdown for all time - only include months with data
+      if (entries.length === 0) break
+
+      // Find the date range from actual entries
+      const sortedDates = entries.map((e) => e.date).sort()
+      const firstDate = dayjs(sortedDates[0]).startOf('month')
+      const lastDate = dayjs(sortedDates[sortedDates.length - 1]).endOf('month')
+
+      let monthStart = firstDate
+
+      while (monthStart.isBefore(lastDate) || monthStart.isSame(lastDate, 'month')) {
+        const monthEnd = monthStart.endOf('month')
+        const startStr = monthStart.format('YYYY-MM-DD')
+        const endStr = monthEnd.format('YYYY-MM-DD')
+
+        const monthEntries = entries.filter(
+          (e) => e.date >= startStr && e.date <= endStr
+        )
+
+        // Only include months that have entries
+        if (monthEntries.length > 0) {
+          const completed = monthEntries.filter(
+            (e) => e.outcome !== 'Pending' && e.outcome !== 'Scratched'
+          )
+
+          data.push({
+            label: monthStart.format("MMM 'YY"),
+            profit: completed.reduce((sum, e) => sum + calculateProfitLoss(e), 0),
+            outlay: monthEntries.reduce((sum, e) => sum + (e.backBet?.stake || 0), 0),
+            races: completed.length,
+            startDate: startStr,
+            endDate: endStr,
+          })
+        }
 
         monthStart = monthStart.add(1, 'month').startOf('month')
       }

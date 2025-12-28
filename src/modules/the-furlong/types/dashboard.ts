@@ -6,7 +6,7 @@
 /**
  * Time period options for dashboard filtering
  */
-export type TimePeriod = 'week' | 'month' | 'quarter' | 'year'
+export type TimePeriod = 'week' | 'month' | 'quarter' | 'year' | 'all'
 
 /**
  * Configuration for time period display
@@ -16,6 +16,7 @@ export const TIME_PERIOD_CONFIG: Record<TimePeriod, { label: string; shortLabel:
   month: { label: 'This Month', shortLabel: 'Month' },
   quarter: { label: 'This Quarter', shortLabel: 'Quarter' },
   year: { label: 'This Year', shortLabel: 'Year' },
+  all: { label: 'All Time', shortLabel: 'All' },
 }
 
 /**

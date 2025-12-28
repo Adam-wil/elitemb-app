@@ -75,7 +75,7 @@ function RacingDashboard() {
 
       {/* Chart */}
       <Box sx={{ mb: 3 }}>
-        <ProfitChart data={chartData} loading={loading} />
+        <ProfitChart data={chartData} loading={loading} period={period} />
       </Box>
 
       {/* Metrics Cards */}

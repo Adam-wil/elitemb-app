@@ -94,15 +94,25 @@ function normalizeHorseName(name: string): string {
 
 /**
  * Calculate profit/loss for a tracked entry based on outcome
+ * Supports both matched betting (with lay) and back-only betting
  */
 export function calculateProfitLoss(entry: TrackedRaceEntry): number {
   const { backBet, layBet, outcome } = entry
 
-  // Validate bet data
-  if (!backBet.stake || !backBet.odds || !layBet.stake || !layBet.odds) {
+  // Validate back bet data is present
+  if (!backBet.stake || !backBet.odds) {
     return 0
   }
 
+  // Check if this is a back-only bet (no lay data)
+  const hasLayBet = layBet.stake && layBet.odds
+
+  if (!hasLayBet) {
+    // Back-only calculation (no lay bet)
+    return calculateBackOnlyPL(backBet, outcome)
+  }
+
+  // Matched betting calculation (has both back and lay)
   switch (outcome) {
     case '1/W':
       return calculateWinPL(backBet, layBet)
@@ -129,6 +139,39 @@ export function calculateProfitLoss(entry: TrackedRaceEntry): number {
     case 'Scratched':
       // Bets voided, may have small exchange costs
       return calculateScratchedPL(layBet)
+
+    case 'Pending':
+    default:
+      return 0
+  }
+}
+
+/**
+ * Back-only profit/loss calculation (no lay bet)
+ * Used for arb betting, promo betting without laying, etc.
+ */
+function calculateBackOnlyPL(backBet: BetSide, outcome: RaceOutcome): number {
+  switch (outcome) {
+    case '1/W':
+      // Win: profit = stake × (odds - 1)
+      return backBet.stake * (backBet.odds - 1)
+
+    case '2/L':
+      // Loss: lose the stake
+      return -backBet.stake
+
+    case 'Dead Heat':
+      // Dead heat: half win
+      return (backBet.stake * (backBet.odds - 1)) / 2
+
+    case 'Bonus':
+      // Lose stake but get bonus (bonus tracked separately)
+      return -backBet.stake
+
+    case 'Refund':
+    case 'Scratched':
+      // Stake returned
+      return 0
 
     case 'Pending':
     default:
