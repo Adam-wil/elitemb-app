@@ -6,36 +6,125 @@ datasource db {
   provider = "postgresql"
 }
 
-model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  profiles  Profile[]
+model Account {
+  id              String          @id @default(uuid())
+  profileId       String
+  code            String
+  name            String
+  type            AccountType
+  subType         AccountSubType?
+  parentCode      String?
+  category        String?
+  profileBookieId String?
+  bookieId        Int?            // Direct FK to Bookie for bookie-specific accounts
+  bookieName      String?         // Denormalized bookie name for display
+  bankName        String?         // For bank accounts (e.g., "Bookie Bank")
+  isActive        Boolean         @default(true)
+  isSystem        Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Reconciliation fields - for comparing calculated vs actual balance
+  actualBalance   Decimal?        @db.Decimal(19, 4) // User-entered actual bookie balance
+  actualBalanceAt DateTime?       // When actualBalance was last entered
+
+  ProfileBookie   ProfileBookie?  @relation(fields: [profileBookieId], references: [id])
+  Profile         Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  Bookie          Bookie?         @relation(fields: [bookieId], references: [id])
+  JournalLine     JournalLine[]
+
+  @@unique([profileId, code])
+  @@unique([profileId, subType, bookieId])
+  @@index([profileBookieId])
+  @@index([profileId, category])
+  @@index([profileId, type])
+  @@index([profileId, subType])
+  @@index([bookieId])
 }
 
-model Profile {
-  id                   String                @id @default(uuid())
-  userId               String
-  name                 String
-  isDefault            Boolean               @default(false)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  bookieNotes          BookieNote[]
-  bookieRatioConfigs   BookieRatioConfig[]
-  bonuses              Bonus[]
-  commissionPreference CommissionPreference?
-  layManagerEntries    LayManagerEntry[]
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planEntries          RacingPlanEntry[]
-  trackerEntries       RacingTrackerEntry[]
-  accountLedgerEntries AccountLedger[]
-  accountBalances      AccountBalance[]
+model AccountBalance {
+  id             String    @id
+  profileId      String
+  bookieId       Int?
+  bookieName     String
+  isExchange     Boolean   @default(false)
+  currentBalance Decimal   @default(0) @db.Decimal(10, 2)
+  totalPL        Decimal   @default(0) @db.Decimal(10, 2)
+  lastUpdated    DateTime  @default(now())
+  isOverridden   Boolean   @default(false)
+  overrideValue  Decimal?  @db.Decimal(10, 2)
+  overrideReason String?
+  overrideAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime
+  Bookie         Bookie?   @relation(fields: [bookieId], references: [id])
+  Profile        Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@unique([profileId, bookieName])
+  @@index([profileId])
 }
 
-/// 134 Australian/NZ bookies with all metadata
+model AccountLedger {
+  id                String          @id
+  profileId         String
+  bookieId          Int?
+  bookieName        String
+  isExchange        Boolean         @default(false)
+  entryType         LedgerEntryType
+  amount            Decimal         @db.Decimal(10, 2)
+  direction         String
+  runningBalance    Decimal         @db.Decimal(10, 2)
+  date              DateTime
+  description       String?
+  notes             String?
+  bankTransactionId String?
+  trackerEntryId    String?
+  layManagerEntryId String?
+  bonusCreditId     String?
+  isReconciled      Boolean         @default(false)
+  reconciledAt      DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime
+  Bookie            Bookie?         @relation(fields: [bookieId], references: [id])
+  Profile           Profile         @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([bankTransactionId])
+  @@index([entryType])
+  @@index([layManagerEntryId])
+  @@index([profileId, bookieName])
+  @@index([profileId, date])
+  @@index([trackerEntryId])
+}
+
+model Bonus {
+  id                                                               String              @id
+  profileId                                                        String
+  bookie                                                           String
+  amount                                                           Decimal             @db.Decimal(10, 2)
+  dateEarned                                                       DateTime            @db.Date
+  expiryDate                                                       DateTime            @db.Date
+  status                                                           BonusStatus         @default(PENDING)
+  turnedOverAt                                                     DateTime?
+  bonusTurnoverProfit                                              Decimal?            @db.Decimal(10, 2)
+  sourceRacingEntryId                                              String?             @unique
+  sourceLayManagerEntryId                                          String?             @unique
+  sourcePromoType                                                  String?
+  notes                                                            String?
+  createdAt                                                        DateTime            @default(now())
+  updatedAt                                                        DateTime
+  Profile                                                          Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  LayManagerEntry_Bonus_sourceLayManagerEntryIdToLayManagerEntry   LayManagerEntry?    @relation("Bonus_sourceLayManagerEntryIdToLayManagerEntry", fields: [sourceLayManagerEntryId], references: [id])
+  RacingTrackerEntry_Bonus_sourceRacingEntryIdToRacingTrackerEntry RacingTrackerEntry? @relation("Bonus_sourceRacingEntryIdToRacingTrackerEntry", fields: [sourceRacingEntryId], references: [id])
+  LayManagerEntry_LayManagerEntry_linkedBonusIdToBonus             LayManagerEntry?    @relation("LayManagerEntry_linkedBonusIdToBonus")
+  RacingTrackerEntry_RacingTrackerEntry_linkedBonusIdToBonus       RacingTrackerEntry? @relation("RacingTrackerEntry_linkedBonusIdToBonus")
+
+  @@index([bookie])
+  @@index([expiryDate])
+  @@index([profileId])
+  @@index([profileId, status])
+  @@index([status])
+}
+
 model Bookie {
   id                  Int                 @id @default(autoincrement())
   name                String              @unique
@@ -59,39 +148,247 @@ model Bookie {
   isExchange          Boolean             @default(false)
   isActive            Boolean             @default(true)
   createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  bookieNotes         BookieNote[]
-  ratioConfigs        BookieRatioConfig[]
-  ledgerEntries       AccountLedger[]
-  accountBalances     AccountBalance[]
+  updatedAt           DateTime
+  Account             Account[]
+  AccountBalance      AccountBalance[]
+  AccountLedger       AccountLedger[]
+  BookieNote          BookieNote[]
+  BookieRatioConfig   BookieRatioConfig[]
+  DepositMatch        DepositMatch[]
+  ProfileBookie       ProfileBookie[]
 }
 
-/// State commission rates for Betfair based on track location
-model StateCommissionRate {
-  code        String   @id
-  name        String
-  defaultRate Decimal  @db.Decimal(5, 2)
+model BookieNote {
+  id        String   @id
+  profileId String
+  bookieId  Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Bookie    Bookie   @relation(fields: [bookieId], references: [id], onDelete: Cascade)
+  Profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, bookieId])
+  @@index([bookieId])
+  @@index([profileId])
+}
+
+model BookieRatioConfig {
+  id                String              @id
+  profileId         String
+  bookieId          Int
+  promoRatio        Int                 @default(1)
+  nonPromoRatio     Int                 @default(3)
+  timeWindow        RatioTimeWindow     @default(WEEKLY)
+  status            BookieAccountStatus @default(PROMO_ELIGIBLE)
+  statusNotes       String?
+  statusChangedAt   DateTime?
+  warningThreshold  Int                 @default(80)
+  exceededThreshold Int                 @default(100)
+  isEnabled         Boolean             @default(true)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  Bookie            Bookie              @relation(fields: [bookieId], references: [id], onDelete: Cascade)
+  Profile           Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, bookieId])
+  @@index([profileId])
+  @@index([status])
+}
+
+model CommissionPreference {
+  id          String   @id
+  profileId   String   @unique
+  defaultRate Decimal  @default(5) @db.Decimal(5, 2)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  tracks      Track[]
+  updatedAt   DateTime
+  Profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
 }
 
-/// 150+ Australian/NZ tracks with state mapping
-model Track {
-  id        Int                 @id @default(autoincrement())
-  name      String              @unique
-  stateCode String
-  country   String              @default("AU")
-  isActive  Boolean             @default(true)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-  state     StateCommissionRate @relation(fields: [stateCode], references: [code])
+/// User preferences for UI settings and filter states
+model UserPreference {
+  id                    String    @id @default(uuid())
+  profileId             String    @unique
+  /// Current ledger filter: 'all' | 'bookies' | 'exchange' | 'attention'
+  ledgerFilter          String    @default("all")
+  /// Last time user viewed/reconciled accounts (for "Last reconciled X days ago")
+  lastReconciledAt      DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  Profile               Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
 
-  @@index([stateCode])
+model JournalEntry {
+  id                String           @id
+  profileId         String
+  entryDate         DateTime
+  entryType         JournalEntryType
+  description       String?
+  referenceType     String?
+  referenceId       String?
+  betType           BetType?
+  bankTransactionId String?          // Basiq transaction ID for bank deposits/withdrawals
+  isVoid            Boolean          @default(false)
+  voidReason        String?
+  voidedAt          DateTime?
+  // Reversal linking for audit trail
+  reversesEntryId   String?          // Points to entry this reverses
+  reversedByEntryId String?          // Points to entry that reversed this
+  createdAt         DateTime         @default(now())
+  createdBy         String?
+  Profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  JournalLine       JournalLine[]
+
+  @@index([isVoid])
+  @@index([profileId, entryDate])
+  @@index([profileId, entryType])
+  @@index([profileId, referenceType, referenceId])
+  @@index([profileId, bankTransactionId])
+  @@index([reversesEntryId])
+  @@index([reversedByEntryId])
+}
+
+model JournalLine {
+  id             String       @id
+  journalEntryId String
+  accountId      String
+  debit          Decimal      @default(0) @db.Decimal(12, 2)
+  credit         Decimal      @default(0) @db.Decimal(12, 2)
+  memo           String?
+  Account        Account      @relation(fields: [accountId], references: [id])
+  JournalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([journalEntryId])
+}
+
+// Deposit match bonuses (sign-up offers, reload bonuses, deposit matches)
+// Linked to journal entries for accounting
+model DepositMatch {
+  id             String        @id @default(cuid())
+  profileId      String
+  bookieId       Int
+  amount         Decimal       @db.Decimal(10, 2)
+  date           DateTime      @db.Date
+  notes          String?
+  journalEntryId String?       @unique // One-to-one with JournalEntry
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  Profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  Bookie         Bookie        @relation(fields: [bookieId], references: [id])
+
+  @@index([profileId])
+  @@index([profileId, bookieId])
+  @@index([journalEntryId])
+}
+
+model LayManagerEntry {
+  id                                                   String      @id
+  profileId                                            String
+  date                                                 DateTime    @db.Date
+  time                                                 String
+  track                                                String
+  raceNumber                                           Int
+  meetingId                                            Int?
+  selectionName                                        String
+  selectionNumber                                      Int
+  selectedNormalBookies                                String[]    @default([])
+  selectedBetBackBookies                               String[]    @default([])
+  promoDetails                                         Json        @default("{}")
+  backBookie                                           String
+  backStake                                            Decimal     @db.Decimal(10, 2)
+  backOdds                                             Decimal     @db.Decimal(8, 3)
+  backCommissionPercent                                Decimal?    @db.Decimal(5, 2)
+  layBookie                                            String      @default("Betfair")
+  layStake                                             Decimal     @db.Decimal(10, 2)
+  layOdds                                              Decimal     @db.Decimal(8, 3)
+  layCommissionPercent                                 Decimal?    @db.Decimal(5, 2)
+  unitTier                                             UnitTier    @default(NEUTRAL)
+  autoResult                                           Json?
+  lastPolledAt                                         DateTime?
+  pollAttempts                                         Int         @default(0)
+  outcome                                              RaceOutcome @default(PENDING)
+  outcomeNotes                                         String?
+  profitLoss                                           Decimal?    @db.Decimal(10, 2)
+  lockedInAt                                           DateTime    @default(now())
+  updatedAt                                            DateTime
+  readOnly                                             Boolean     @default(false)
+  linkedBonusId                                        String?     @unique
+  // Multi-leg bet fields
+  raceBetType                                          RaceBetType @default(WIN)
+  isMultiLeg                                           Boolean     @default(false)
+  parentBetId                                          String?     // Self-reference for legs
+  legNumber                                            Int?        // 1, 2, 3, etc.
+  legCount                                             Int?        // Total legs in multi
+  combinedOdds                                         Decimal?    @db.Decimal(10, 3)
+  // Relations
+  Bonus_Bonus_sourceLayManagerEntryIdToLayManagerEntry Bonus?      @relation("Bonus_sourceLayManagerEntryIdToLayManagerEntry")
+  Bonus_LayManagerEntry_linkedBonusIdToBonus           Bonus?      @relation("LayManagerEntry_linkedBonusIdToBonus", fields: [linkedBonusId], references: [id])
+  Profile                                              Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  // Multi-leg self-relation
+  parentBet                                            LayManagerEntry?  @relation("LayMultiLegs", fields: [parentBetId], references: [id])
+  legs                                                 LayManagerEntry[] @relation("LayMultiLegs")
+
+  @@index([backBookie])
+  @@index([date])
+  @@index([layBookie])
+  @@index([linkedBonusId])
+  @@index([outcome])
+  @@index([profileId, date])
+  @@index([parentBetId])
+  @@index([raceBetType])
+}
+
+model Profile {
+  id                   String                @id
+  userId               String
+  name                 String
+  isDefault            Boolean               @default(false)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime
+  Account              Account[]
+  AccountBalance       AccountBalance[]
+  AccountLedger        AccountLedger[]
+  Bonus                Bonus[]
+  BookieNote           BookieNote[]
+  BookieRatioConfig    BookieRatioConfig[]
+  CommissionPreference CommissionPreference?
+  DepositMatch         DepositMatch[]
+  JournalEntry         JournalEntry[]
+  LayManagerEntry      LayManagerEntry[]
+  User                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  UserPreference       UserPreference?
+  ProfileBookie        ProfileBookie[]
+  RacingPlanEntry      RacingPlanEntry[]
+  RacingTrackerEntry   RacingTrackerEntry[]
+
+  @@index([userId])
+}
+
+model ProfileBookie {
+  id              String              @id
+  profileId       String
+  bookieId        Int
+  displayName     String?
+  status          ProfileBookieStatus @default(ACTIVE)
+  statusChangedAt DateTime?
+  statusNotes     String?
+  hasApiAccess    Boolean             @default(false)
+  apiType         String?
+  lastApiSync     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime
+  Account         Account[]
+  Bookie          Bookie              @relation(fields: [bookieId], references: [id])
+  Profile         Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, bookieId])
+  @@index([profileId, status])
 }
 
 model RacingPlanEntry {
-  id                     String               @id @default(uuid())
+  id                     String               @id
   profileId              String
   date                   DateTime             @db.Date
   track                  String
@@ -107,141 +404,224 @@ model RacingPlanEntry {
   selectedNormalBookies  String[]             @default([])
   selectedBetBackBookies String[]             @default([])
   createdAt              DateTime             @default(now())
-  updatedAt              DateTime             @updatedAt
-  profile                Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  trackerEntries         RacingTrackerEntry[]
+  updatedAt              DateTime
+  Profile                Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  RacingTrackerEntry     RacingTrackerEntry[]
 
   @@unique([profileId, date, track, raceNumber])
-  @@index([profileId, date])
   @@index([date])
+  @@index([profileId, date])
 }
 
 model RacingTrackerEntry {
-  id                     String           @id @default(uuid())
-  profileId              String
-  planEntryId            String?
-  date                   DateTime         @db.Date
-  time                   String
-  track                  String
-  raceNumber             Int
-  meetingId              Int?
-  selectionName          String
-  selectionNumber        Int
-  selectedNormalBookies  String[]         @default([])
-  selectedBetBackBookies String[]         @default([])
-  promoDetails           Json             @default("{}")
-  backBookie             String
-  backStake              Decimal          @db.Decimal(10, 2)
-  backOdds               Decimal          @db.Decimal(8, 3)
-  backCommissionPercent  Decimal?         @db.Decimal(5, 2)
-  layBookie              String?          @default("Betfair")
-  layStake               Decimal?         @db.Decimal(10, 2)
-  layOdds                Decimal?         @db.Decimal(8, 3)
-  layCommissionPercent   Decimal?         @db.Decimal(5, 2)
-  unitTier               UnitTier         @default(NEUTRAL)
-  promoType              String?          // PromoType for bonus determination (none, 2nd_bonus, 2nd_3rd_bonus, bet_back)
-  autoResult             Json?
-  lastPolledAt           DateTime?
-  pollAttempts           Int              @default(0)
-  outcome                RaceOutcome      @default(PENDING)
-  outcomeNotes           String?
-  profitLoss             Decimal?         @db.Decimal(10, 2)
-  lockedInAt             DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-  readOnly               Boolean          @default(false)
-  linkedBonusId          String?          @unique // Bonus being used/turned over in this race
-  generatedBonusId       String?          // Bonus generated from this race (when outcome = Bonus)
-  planEntry              RacingPlanEntry? @relation(fields: [planEntryId], references: [id])
-  profile                Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  linkedBonus            Bonus?           @relation("UsedBonus", fields: [linkedBonusId], references: [id])
-  generatedBonus         Bonus?           @relation("GeneratedBonus")
+  id                                                  String           @id
+  profileId                                           String
+  planEntryId                                         String?
+  date                                                DateTime         @db.Date
+  time                                                String
+  track                                               String
+  raceNumber                                          Int
+  meetingId                                           Int?
+  selectionName                                       String
+  selectionNumber                                     Int
+  selectedNormalBookies                               String[]         @default([])
+  selectedBetBackBookies                              String[]         @default([])
+  promoDetails                                        Json             @default("{}")
+  backBookie                                          String
+  backStake                                           Decimal          @db.Decimal(10, 2)
+  backOdds                                            Decimal          @db.Decimal(8, 3)
+  backCommissionPercent                               Decimal?         @db.Decimal(5, 2)
+  layBookie                                           String?          @default("Betfair")
+  layStake                                            Decimal?         @db.Decimal(10, 2)
+  layOdds                                             Decimal?         @db.Decimal(8, 3)
+  layCommissionPercent                                Decimal?         @db.Decimal(5, 2)
+  unitTier                                            UnitTier         @default(NEUTRAL)
+  autoResult                                          Json?
+  lastPolledAt                                        DateTime?
+  pollAttempts                                        Int              @default(0)
+  outcome                                             RaceOutcome      @default(PENDING)
+  outcomeNotes                                        String?
+  profitLoss                                          Decimal?         @db.Decimal(10, 2)
+  lockedInAt                                          DateTime         @default(now())
+  updatedAt                                           DateTime
+  readOnly                                            Boolean          @default(false)
+  generatedBonusId                                    String?
+  linkedBonusId                                       String?          @unique
+  promoType                                           String?
+  // Multi-leg bet fields
+  raceBetType                                         RaceBetType      @default(WIN)
+  isMultiLeg                                          Boolean          @default(false)
+  parentBetId                                         String?          // Self-reference for legs
+  legNumber                                           Int?             // 1, 2, 3, etc.
+  legCount                                            Int?             // Total legs in multi
+  combinedOdds                                        Decimal?         @db.Decimal(10, 3)
+  // Relations
+  Bonus_Bonus_sourceRacingEntryIdToRacingTrackerEntry Bonus?           @relation("Bonus_sourceRacingEntryIdToRacingTrackerEntry")
+  Bonus_RacingTrackerEntry_linkedBonusIdToBonus       Bonus?           @relation("RacingTrackerEntry_linkedBonusIdToBonus", fields: [linkedBonusId], references: [id])
+  RacingPlanEntry                                     RacingPlanEntry? @relation(fields: [planEntryId], references: [id])
+  Profile                                             Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  // Multi-leg self-relation
+  parentBet                                           RacingTrackerEntry?  @relation("RacingMultiLegs", fields: [parentBetId], references: [id])
+  legs                                                RacingTrackerEntry[] @relation("RacingMultiLegs")
 
-  @@index([profileId, date])
-  @@index([date])
-  @@index([outcome])
   @@index([backBookie])
-  @@index([linkedBonusId])
-}
-
-model LayManagerEntry {
-  id                     String      @id @default(uuid())
-  profileId              String
-  date                   DateTime    @db.Date
-  time                   String
-  track                  String
-  raceNumber             Int
-  meetingId              Int?
-  selectionName          String
-  selectionNumber        Int
-  selectedNormalBookies  String[]    @default([])
-  selectedBetBackBookies String[]    @default([])
-  promoDetails           Json        @default("{}")
-  backBookie             String
-  backStake              Decimal     @db.Decimal(10, 2)
-  backOdds               Decimal     @db.Decimal(8, 3)
-  backCommissionPercent  Decimal?    @db.Decimal(5, 2)
-  layBookie              String      @default("Betfair")
-  layStake               Decimal     @db.Decimal(10, 2)
-  layOdds                Decimal     @db.Decimal(8, 3)
-  layCommissionPercent   Decimal?    @db.Decimal(5, 2)
-  unitTier               UnitTier    @default(NEUTRAL)
-  autoResult             Json?
-  lastPolledAt           DateTime?
-  pollAttempts           Int         @default(0)
-  outcome                RaceOutcome @default(PENDING)
-  outcomeNotes           String?
-  profitLoss             Decimal?    @db.Decimal(10, 2)
-  lockedInAt             DateTime    @default(now())
-  updatedAt              DateTime    @updatedAt
-  readOnly               Boolean     @default(false)
-  linkedBonusId          String?     @unique // Bonus being used/turned over in this race
-  profile                Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  linkedBonus            Bonus?      @relation("UsedBonus", fields: [linkedBonusId], references: [id])
-  generatedBonus         Bonus?      @relation("GeneratedBonus")
-
-  @@index([profileId, date])
   @@index([date])
-  @@index([outcome])
-  @@index([backBookie])
-  @@index([layBookie])
   @@index([linkedBonusId])
+  @@index([outcome])
+  @@index([profileId, date])
+  @@index([parentBetId])
+  @@index([raceBetType])
 }
 
-model BookieNote {
-  id        String   @id @default(uuid())
-  profileId String
-  bookieId  Int
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  bookie    Bookie   @relation(fields: [bookieId], references: [id], onDelete: Cascade)
-  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@unique([profileId, bookieId])
-  @@index([profileId])
-  @@index([bookieId])
-}
-
-model CommissionPreference {
-  id          String   @id @default(uuid())
-  profileId   String   @unique
-  defaultRate Decimal  @default(5) @db.Decimal(5, 2)
+model StateCommissionRate {
+  code        String   @id
+  name        String
+  defaultRate Decimal  @db.Decimal(5, 2)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime
+  Track       Track[]
 }
 
-enum UnitTier {
-  GREEN
-  NEUTRAL
-  PINK
+model Track {
+  id                  Int                 @id @default(autoincrement())
+  name                String              @unique
+  stateCode           String
+  country             String              @default("AU")
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime
+  StateCommissionRate StateCommissionRate @relation(fields: [stateCode], references: [code])
+
+  @@index([stateCode])
 }
 
-enum TimeValidationStatus {
+model User {
+  id        String    @id
+  email     String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime
+  Profile   Profile[]
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+/// Account SubType - Granular account classification for Chart of Accounts
+enum AccountSubType {
+  // Asset - Bookie Accounts
+  BOOKIE_CASH
+  BOOKIE_BONUS
+  // Asset - Betfair
+  BETFAIR_AVAILABLE
+  // Asset - Bank
+  BANK
+  // Asset - Pending
+  PENDING_BACK
+  PENDING_LAY
+  // Liability
+  BETFAIR_LIABILITY
+  PENDING_BETFAIR_DEPOSIT // Funds in transit to Betfair
+  // Income
+  BACK_BET_WINS
+  LAY_BET_WINS
+  BONUS_INCOME
+  RACING_INCOME                      // Per-bookie racing income (parent + per-bookie children)
+  BONUS_DEPOSIT_MATCH_RACING_INCOME  // Per-bookie bonus/deposit match income for racing
+  BONUS_DEPOSIT_MATCH_SPORTS_INCOME  // Per-bookie bonus/deposit match income for sports (future)
+  // Expense
+  BACK_BET_LOSSES
+  LAY_BET_PAYOUTS
+  QUALIFYING_LOSS
+  BETFAIR_COMMISSION
+  BONUS_EXPIRED
+  RACING_EXPENSE   // Per-bookie racing expense (parent + per-bookie children)
+  // Equity
+  ADJUSTMENT
+  OPENING_BALANCE_EQUITY
+}
+
+enum BetType {
+  RACING
+  SRM
+  SGM
+  LAY_MANAGER
+}
+
+/// Race Bet Type - Actual bet type for racing tracker entries
+enum RaceBetType {
+  WIN           // Single win bet (default)
+  PLACE         // Single place bet
+  EACH_WAY      // Win + Place combined
+  SRM           // Same Race Multi
+  MULTI         // Multi-leg accumulator
+  SGM           // Same Game Multi (sports)
+  QUADDIE       // 4-race combined bet
+  EXOTIC        // Trifecta, Quinella, First4, etc.
+}
+
+enum BonusStatus {
   PENDING
-  VERIFIED
-  MISMATCH
-  NOT_FOUND
+  TURNED_OVER
+  EXPIRED
+  CANCELLED
+}
+
+enum BookieAccountStatus {
+  PROMO_ELIGIBLE
+  GUBBED
+  STAT_DECD
+  SUSPENDED
+  CLOSED
+}
+
+enum JournalEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+  BET_PLACED
+  BET_SETTLED
+  LAY_PLACED
+  LAY_SETTLED
+  BONUS_CREDITED
+  BONUS_WAGERED
+  BONUS_CONVERTED
+  COMMISSION
+  ADJUSTMENT
+  FEE
+  OPENING_BALANCE
+  SETTLEMENT          // For settling pending deposits/liabilities
+  REVERSAL            // For reversing prior entries during edits
+}
+
+enum LedgerEntryType {
+  DEPOSIT
+  WITHDRAWAL
+  BET_WIN
+  BET_LOSS
+  BONUS_CREDIT
+  BONUS_TURNOVER
+  ADJUSTMENT
+  COMMISSION
+  REFUND
+}
+
+enum ProfileBookieStatus {
+  ACTIVE
+  GUBBED
+  RESTRICTED
+  CLOSED
+  SUSPENDED
+}
+
+enum PromoVolume {
+  HIGH
+  MEDIUM
+  LOW
 }
 
 enum RaceOutcome {
@@ -255,10 +635,10 @@ enum RaceOutcome {
   SCRATCHED
 }
 
-enum PromoVolume {
-  HIGH
-  MEDIUM
-  LOW
+enum RatioTimeWindow {
+  DAILY
+  WEEKLY
+  MONTHLY
 }
 
 enum RiskLevel {
@@ -267,167 +647,15 @@ enum RiskLevel {
   HIGH
 }
 
-enum RatioTimeWindow {
-  DAILY
-  WEEKLY
-  MONTHLY
-}
-
-enum BookieAccountStatus {
-  PROMO_ELIGIBLE
-  GUBBED
-  STAT_DECD
-  SUSPENDED
-  CLOSED
-}
-
-enum BonusStatus {
+enum TimeValidationStatus {
   PENDING
-  TURNED_OVER
-  EXPIRED
-  CANCELLED
+  VERIFIED
+  MISMATCH
+  NOT_FOUND
 }
 
-/// The Stable - Bonus Holding Pen
-/// Tracks bonus bets earned from promos until they are turned over
-model Bonus {
-  id                       String                @id @default(uuid())
-  profileId                String
-  bookie                   String
-  amount                   Decimal               @db.Decimal(10, 2)
-  dateEarned               DateTime              @db.Date
-  expiryDate               DateTime              @db.Date
-  status                   BonusStatus           @default(PENDING)
-  turnedOverAt             DateTime?
-  bonusTurnoverProfit      Decimal?              @db.Decimal(10, 2) // Net bonus profit after Betfair commission and losses
-  sourceRacingEntryId      String?               @unique
-  sourceLayManagerEntryId  String?               @unique
-  sourcePromoType          String?
-  notes                    String?
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
-  profile                  Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  sourceRacingEntry        RacingTrackerEntry?   @relation("GeneratedBonus", fields: [sourceRacingEntryId], references: [id])
-  sourceLayManagerEntry    LayManagerEntry?      @relation("GeneratedBonus", fields: [sourceLayManagerEntryId], references: [id])
-  usedByRacingEntry        RacingTrackerEntry?   @relation("UsedBonus")
-  usedByLayManagerEntry    LayManagerEntry?      @relation("UsedBonus")
-
-  @@index([profileId])
-  @@index([profileId, status])
-  @@index([bookie])
-  @@index([expiryDate])
-  @@index([status])
-}
-
-/// Bookie Health - Promo ratio configuration per bookie
-/// Tracks target promo:non-promo ratios to help avoid being gubbed
-model BookieRatioConfig {
-  id                String              @id @default(uuid())
-  profileId         String
-  bookieId          Int
-  promoRatio        Int                 @default(1)
-  nonPromoRatio     Int                 @default(3)
-  timeWindow        RatioTimeWindow     @default(WEEKLY)
-  status            BookieAccountStatus @default(PROMO_ELIGIBLE)
-  statusNotes       String?
-  statusChangedAt   DateTime?
-  warningThreshold  Int                 @default(80)
-  exceededThreshold Int                 @default(100)
-  isEnabled         Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-
-  profile           Profile             @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  bookie            Bookie              @relation(fields: [bookieId], references: [id], onDelete: Cascade)
-
-  @@unique([profileId, bookieId])
-  @@index([profileId])
-  @@index([status])
-}
-
-// ============================================================================
-// Account Ledger - Financial tracking for bookie/exchange accounts
-// ============================================================================
-
-enum LedgerEntryType {
-  DEPOSIT         // Money sent TO bookie/exchange
-  WITHDRAWAL      // Money received FROM bookie/exchange
-  BET_WIN         // Winning bet P&L (from tracker)
-  BET_LOSS        // Losing bet P&L (from tracker)
-  BONUS_CREDIT    // Bonus received
-  BONUS_TURNOVER  // Bonus wagering result
-  ADJUSTMENT      // Manual balance adjustment
-  COMMISSION      // Exchange commission
-  REFUND          // Bet refund
-}
-
-/// Account Ledger Entry - Individual transaction in the ledger
-/// Creates an audit trail of all balance-affecting transactions
-model AccountLedger {
-  id                String           @id @default(uuid())
-  profileId         String
-  bookieId          Int?             // Null for exchange entries or generic
-  bookieName        String           // Denormalized for display
-  isExchange        Boolean          @default(false)
-
-  entryType         LedgerEntryType
-  amount            Decimal          @db.Decimal(10, 2) // Always positive
-  direction         String           // 'in' or 'out' relative to bookie balance
-  runningBalance    Decimal          @db.Decimal(10, 2) // Balance after this entry
-
-  date              DateTime
-  description       String?
-  notes             String?          // User notes for adjustments
-
-  // Linking to source data
-  bankTransactionId String?          // If from Basiq bank transaction
-  trackerEntryId    String?          // If from racing tracker entry
-  layManagerEntryId String?          // If from lay manager entry
-  bonusCreditId     String?          // If bonus-related
-
-  // Reconciliation
-  isReconciled      Boolean          @default(false)
-  reconciledAt      DateTime?
-
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  bookie            Bookie?          @relation(fields: [bookieId], references: [id])
-
-  @@index([profileId, bookieName])
-  @@index([profileId, date])
-  @@index([bankTransactionId])
-  @@index([trackerEntryId])
-  @@index([layManagerEntryId])
-  @@index([entryType])
-}
-
-/// Account Balance - Current balance per bookie/exchange
-/// Stores the computed balance for quick access
-model AccountBalance {
-  id                String           @id @default(uuid())
-  profileId         String
-  bookieId          Int?
-  bookieName        String
-  isExchange        Boolean          @default(false)
-
-  currentBalance    Decimal          @default(0) @db.Decimal(10, 2)
-  totalPL           Decimal          @default(0) @db.Decimal(10, 2) // Sum of BET_WIN + BET_LOSS only
-  lastUpdated       DateTime         @default(now())
-
-  // Manual override
-  isOverridden      Boolean          @default(false)
-  overrideValue     Decimal?         @db.Decimal(10, 2)
-  overrideReason    String?
-  overrideAt        DateTime?
-
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-
-  profile           Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  bookie            Bookie?          @relation(fields: [bookieId], references: [id])
-
-  @@unique([profileId, bookieName])
-  @@index([profileId])
+enum UnitTier {
+  GREEN
+  NEUTRAL
+  PINK
 }
