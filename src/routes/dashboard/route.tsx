@@ -422,8 +422,8 @@ function DashboardLayout() {
           zIndex: (theme) => theme.zIndex.drawer + 1,
         }}
       >
-        <Toolbar className="justify-between">
-          <Box className="flex items-center gap-2">
+        <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <IconButton
               color="inherit"
               edge="start"
@@ -436,7 +436,7 @@ function DashboardLayout() {
               Systematic
             </Typography>
           </Box>
-          <IconButton onClick={handleProfileClick}>
+          <IconButton onClick={handleProfileClick} sx={{ ml: 'auto' }}>
             <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36 }}>
               A
             </Avatar>

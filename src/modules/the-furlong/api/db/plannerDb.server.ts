@@ -52,25 +52,25 @@ export interface PlanEntryUpdate {
 async function getDefaultProfileId(): Promise<string> {
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
-    include: { profiles: { where: { isDefault: true } } },
+    include: { Profile: { where: { isDefault: true } } },
   })
 
   if (!user) {
     user = await prisma.user.create({
       data: {
         email: 'default@elitemb.local',
-        profiles: {
+        Profile: {
           create: {
             name: 'Default Profile',
             isDefault: true,
           },
         },
       },
-      include: { profiles: { where: { isDefault: true } } },
+      include: { Profile: { where: { isDefault: true } } },
     })
   }
 
-  const profile = user.profiles[0]
+  const profile = user.Profile[0]
   if (!profile) {
     const newProfile = await prisma.profile.create({
       data: {
