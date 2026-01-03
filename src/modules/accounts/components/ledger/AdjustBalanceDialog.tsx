@@ -18,9 +18,25 @@ import {
   InputAdornment,
   IconButton,
   Alert,
+  Chip,
+  Stack,
 } from '@mui/material'
 import { X, AlertCircle } from 'lucide-react'
 import { formatLedgerCurrency } from '../../types/ledger'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const COMMON_REASONS = [
+  'Balance reconciliation',
+  'Missing deposit',
+  'Unrecorded withdrawal',
+  'Bonus adjustment',
+  'Commission correction',
+]
+
+const MIN_REASON_LENGTH = 5
 
 // ============================================================================
 // Types
@@ -77,13 +93,14 @@ export function AdjustBalanceDialog({
   const differenceColor = difference > 0 ? '#2e7d32' : difference < 0 ? '#c62828' : '#6b7280'
 
   // Validation
+  const isReasonValid = reason.trim().length >= MIN_REASON_LENGTH
   const isValid = useMemo(() => {
     const balance = parseFloat(newBalance)
     if (isNaN(balance)) return false
     if (difference === 0) return false
-    if (!reason.trim()) return false
+    if (!isReasonValid) return false
     return true
-  }, [newBalance, difference, reason])
+  }, [newBalance, difference, isReasonValid])
 
   // Handle submit
   const handleSubmit = async () => {
@@ -142,7 +159,7 @@ export function AdjustBalanceDialog({
 
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-            Current Balance
+            Current App Balance
           </Typography>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             {formatLedgerCurrency(currentBalance)}
@@ -150,7 +167,7 @@ export function AdjustBalanceDialog({
         </Box>
 
         <TextField
-          label="New Balance"
+          label="Actual Bookie Balance"
           value={newBalance}
           onChange={(e) => setNewBalance(e.target.value)}
           fullWidth
@@ -196,8 +213,34 @@ export function AdjustBalanceDialog({
           multiline
           rows={2}
           placeholder="e.g., Correcting balance after manual withdrawal"
-          helperText="Explain why you're adjusting the balance"
+          error={reason.length > 0 && !isReasonValid}
+          helperText={
+            reason.length > 0 && !isReasonValid
+              ? `Minimum ${MIN_REASON_LENGTH} characters required`
+              : 'Explain why you\'re adjusting the balance'
+          }
+          sx={{ mb: 2 }}
         />
+
+        {/* Quick-select reason chips */}
+        <Box>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+            Common reasons:
+          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            {COMMON_REASONS.map((chipReason) => (
+              <Chip
+                key={chipReason}
+                label={chipReason}
+                size="small"
+                onClick={() => setReason(chipReason)}
+                variant={reason === chipReason ? 'filled' : 'outlined'}
+                color={reason === chipReason ? 'primary' : 'default'}
+                sx={{ mb: 1 }}
+              />
+            ))}
+          </Stack>
+        </Box>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 3 }}>

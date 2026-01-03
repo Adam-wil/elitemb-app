@@ -8,6 +8,40 @@
 // Re-export ledger types
 export * from './ledger'
 
+// Re-export journal types
+export * from './journal'
+
+// ============================================================================
+// Chart of Accounts Types
+// ============================================================================
+
+import type { AccountType, AccountSubType } from '@prisma/client'
+
+/**
+ * Account balance calculated from JournalLine entries
+ * Represents a row from the AccountBalanceView database view
+ */
+export interface AccountBalanceView {
+  id: string
+  profileId: string
+  code: string
+  name: string
+  type: AccountType
+  subType: AccountSubType | null
+  parentCode: string | null
+  category: string | null
+  profileBookieId: string | null
+  bookieId: number | null
+  bookieName: string | null
+  bankName: string | null
+  isActive: boolean
+  isSystem: boolean
+  createdAt: Date
+  updatedAt: Date
+  /** Calculated balance: SUM(debit) - SUM(credit) from JournalLine entries */
+  balance: number
+}
+
 // ============================================================================
 // Basiq API Types
 // ============================================================================
@@ -176,6 +210,7 @@ export interface BonusCredit {
   amount: number // Bonus amount received
   date: string // YYYY-MM-DD
   notes: string // e.g., "Sign-up 100/100"
+  journalEntryId?: string // Links to journal system for voiding
   createdAt: string
   updatedAt: string
 }

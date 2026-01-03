@@ -3,10 +3,11 @@
  *
  * Hero card showing total balance with trend indicator and P&L summary.
  * Mobile-first design with large touch targets.
+ * Displays variance indicator when calculated balance differs from actual.
  */
 
-import { Box, Paper, Typography, Skeleton } from '@mui/material'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Box, Paper, Typography, Skeleton, Button, Alert } from '@mui/material'
+import { TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import { formatLedgerCurrency } from '../../types/ledger'
 
 // ============================================================================
@@ -18,12 +19,14 @@ interface BalanceSummaryCardProps {
   totalBalance: number
   /** Total P&L */
   totalPL: number
-  /** Change from previous period */
-  periodChange?: number
-  /** Period label (e.g., "this week", "this month") */
-  periodLabel?: string
   /** Is data loading? */
   isLoading?: boolean
+  /** Error message (shows error state when set) */
+  error?: string | null
+  /** Callback for retry button in error state */
+  onRetry?: () => void
+  /** View mode: hide P&L in reconcile mode */
+  mode?: 'performance' | 'reconcile'
 }
 
 // ============================================================================
@@ -33,23 +36,16 @@ interface BalanceSummaryCardProps {
 export function BalanceSummaryCard({
   totalBalance,
   totalPL,
-  periodChange = 0,
-  periodLabel = 'this week',
   isLoading = false,
+  error = null,
+  onRetry,
+  mode = 'performance',
 }: BalanceSummaryCardProps) {
-  // Determine trend
-  const isPositive = periodChange > 0
-  const isNegative = periodChange < 0
-  const isNeutral = periodChange === 0
-
   // Colors
-  const trendColor = isPositive ? '#2e7d32' : isNegative ? '#c62828' : '#6b7280'
   const plColor = totalPL >= 0 ? '#2e7d32' : '#c62828'
 
-  // Trend icon
-  const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus
-
-  if (isLoading) {
+  // Error state
+  if (error) {
     return (
       <Paper
         sx={{
@@ -59,12 +55,50 @@ export function BalanceSummaryCard({
           borderRadius: 3,
         }}
       >
-        <Box sx={{ textAlign: 'center', mb: 2 }}>
-          <Skeleton variant="text" width={120} height={24} sx={{ mx: 'auto', bgcolor: 'rgba(255,255,255,0.1)' }} />
-          <Skeleton variant="text" width={180} height={56} sx={{ mx: 'auto', bgcolor: 'rgba(255,255,255,0.1)' }} />
-          <Skeleton variant="text" width={140} height={20} sx={{ mx: 'auto', bgcolor: 'rgba(255,255,255,0.1)' }} />
+        <Alert
+          severity="error"
+          icon={<AlertTriangle size={20} />}
+          sx={{
+            backgroundColor: 'rgba(211, 47, 47, 0.15)',
+            color: 'white',
+            '& .MuiAlert-icon': { color: '#ff6b6b' },
+          }}
+          action={
+            onRetry && (
+              <Button
+                color="inherit"
+                size="small"
+                onClick={onRetry}
+                startIcon={<RefreshCw size={14} />}
+                sx={{ color: 'white' }}
+              >
+                Retry
+              </Button>
+            )
+          }
+        >
+          {error}
+        </Alert>
+      </Paper>
+    )
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Paper
+        sx={{
+          p: { xs: 2, sm: 3 },
+          background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+          color: 'white',
+          borderRadius: 3,
+        }}
+      >
+        <Box sx={{ textAlign: 'center', mb: 1.5 }}>
+          <Skeleton variant="text" width={100} height={20} sx={{ mx: 'auto', bgcolor: 'rgba(255,255,255,0.1)' }} />
+          <Skeleton variant="text" width={140} height={40} sx={{ mx: 'auto', bgcolor: 'rgba(255,255,255,0.1)' }} />
         </Box>
-        <Skeleton variant="rectangular" height={40} sx={{ borderRadius: 1, bgcolor: 'rgba(255,255,255,0.1)' }} />
+        <Skeleton variant="rectangular" height={36} sx={{ borderRadius: 1, bgcolor: 'rgba(255,255,255,0.1)' }} />
       </Paper>
     )
   }
@@ -72,7 +106,8 @@ export function BalanceSummaryCard({
   return (
     <Paper
       sx={{
-        p: 3,
+        p: { xs: 2, sm: 3 },
+        width: '100%',
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         color: 'white',
         borderRadius: 3,
@@ -83,14 +118,14 @@ export function BalanceSummaryCard({
       }}
     >
       {/* Main Balance Section */}
-      <Box sx={{ textAlign: 'center', mb: 2 }}>
+      <Box sx={{ textAlign: 'center', py: { xs: 0.5, sm: 1 } }}>
         <Typography
-          variant="body2"
           sx={{
-            color: 'rgba(255,255,255,0.7)',
+            color: 'rgba(255,255,255,0.6)',
             fontWeight: 500,
-            letterSpacing: 1,
+            letterSpacing: 0.5,
             textTransform: 'uppercase',
+            fontSize: { xs: '0.7rem', sm: '0.875rem' },
             mb: 0.5,
           }}
         >
@@ -98,56 +133,35 @@ export function BalanceSummaryCard({
         </Typography>
 
         <Typography
-          variant="h3"
           sx={{
             fontWeight: 700,
-            letterSpacing: -1,
-            mb: 0.5,
+            letterSpacing: -0.5,
+            fontSize: { xs: '1.75rem', sm: '2.5rem' },
           }}
         >
           {formatLedgerCurrency(totalBalance)}
         </Typography>
-
-        {/* Trend Indicator */}
-        <Box
-          sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 0.5,
-            px: 1.5,
-            py: 0.5,
-            borderRadius: 10,
-            backgroundColor: `${trendColor}22`,
-            color: isNeutral ? 'rgba(255,255,255,0.6)' : trendColor,
-          }}
-        >
-          <TrendIcon size={14} />
-          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            {isNeutral ? 'No change' : `${isPositive ? '+' : ''}${formatLedgerCurrency(periodChange)}`}
-          </Typography>
-          <Typography variant="body2" sx={{ opacity: 0.7 }}>
-            {periodLabel}
-          </Typography>
-        </Box>
       </Box>
 
-      {/* P&L Summary Bar */}
+      {/* P&L Summary Bar - Always rendered for consistent height, invisible in reconcile mode */}
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          px: 2,
-          py: 1.5,
+          px: { xs: 1.5, sm: 2 },
+          py: { xs: 1, sm: 1.5 },
+          mt: 1,
           borderRadius: 2,
           backgroundColor: 'rgba(255,255,255,0.08)',
+          visibility: mode === 'performance' ? 'visible' : 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+          <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: { xs: '0.8rem', sm: '0.875rem' } }}>
             P&L:
           </Typography>
-          <Typography variant="body1" sx={{ fontWeight: 600, color: plColor }}>
+          <Typography sx={{ fontWeight: 600, color: plColor, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
             {totalPL >= 0 ? '+' : ''}{formatLedgerCurrency(totalPL)}
           </Typography>
         </Box>
@@ -163,6 +177,7 @@ export function BalanceSummaryCard({
           {totalPL >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
         </Box>
       </Box>
+
     </Paper>
   )
 }

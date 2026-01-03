@@ -1,40 +1,36 @@
 /**
  * Account Detail Sheet
  *
- * Bottom sheet showing account details, summary stats, and recent activity.
+ * Bottom sheet showing account details, summary stats, and journal entry history.
+ * Uses the double-entry accounting JournalEntryList for transaction display.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Drawer,
   Box,
   Typography,
-  Button,
   IconButton,
-  Divider,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
   Skeleton,
+  Divider,
 } from '@mui/material'
+import { X } from 'lucide-react'
+import type { AccountBalance } from '../../types/ledger'
+import { formatLedgerCurrency } from '../../types/ledger'
+import { ActualBalanceInput } from './ActualBalanceInput'
+import { JournalEntryList } from '../JournalEntryList'
 import {
-  X,
-  ArrowUpRight,
-  ArrowDownLeft,
-  TrendingUp,
-  TrendingDown,
-  Gift,
-  RefreshCw,
-  Edit2,
-  Percent,
-  RotateCcw,
-  ChevronRight,
-  AlertCircle,
-} from 'lucide-react'
-import type { AccountBalance, LedgerEntry, LedgerEntryType } from '../../types/ledger'
-import { formatLedgerCurrency, LEDGER_ENTRY_CONFIG } from '../../types/ledger'
-import { AdjustBalanceDialog } from './AdjustBalanceDialog'
+  getAccountByBookieName,
+  getActualBalanceInfo,
+  updateActualBalance,
+  type ActualBalanceInfo,
+} from '../../api/db/accountBalanceView.server'
+
+// Format bookie name to title case (e.g., "POINTSBET" -> "Pointsbet")
+const formatBookieName = (name: string): string => {
+  if (!name) return name
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+}
 
 // ============================================================================
 // Types
@@ -47,30 +43,14 @@ interface AccountDetailSheetProps {
   onClose: () => void
   /** Account balance data */
   account: AccountBalance | null
-  /** Recent ledger entries */
-  entries: LedgerEntry[]
   /** Is loading? */
   isLoading?: boolean
   /** Adjust balance handler */
   onAdjustBalance: (bookieName: string, newBalance: number, reason: string) => Promise<void>
-  /** View all activity handler */
-  onViewAllActivity?: () => void
-}
-
-// ============================================================================
-// Entry Icon Map
-// ============================================================================
-
-const entryIconMap: Record<LedgerEntryType, React.ReactNode> = {
-  DEPOSIT: <ArrowUpRight size={16} />,
-  WITHDRAWAL: <ArrowDownLeft size={16} />,
-  BET_WIN: <TrendingUp size={16} />,
-  BET_LOSS: <TrendingDown size={16} />,
-  BONUS_CREDIT: <Gift size={16} />,
-  BONUS_TURNOVER: <RefreshCw size={16} />,
-  ADJUSTMENT: <Edit2 size={16} />,
-  COMMISSION: <Percent size={16} />,
-  REFUND: <RotateCcw size={16} />,
+  /** Profile ID for journal queries */
+  profileId?: string
+  /** View mode: 'reconcile' for balance fixing, 'performance' for P&L view */
+  mode?: 'reconcile' | 'performance'
 }
 
 // ============================================================================
@@ -81,12 +61,97 @@ export function AccountDetailSheet({
   open,
   onClose,
   account,
-  entries,
   isLoading = false,
   onAdjustBalance,
-  onViewAllActivity,
+  profileId,
+  mode = 'performance',
 }: AccountDetailSheetProps) {
-  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false)
+  console.log('AccountDetailSheet mode:', mode)
+  const [accountId, setAccountId] = useState<string | null>(null)
+  const [accountIdLoading, setAccountIdLoading] = useState(false)
+  const [actualBalanceInfo, setActualBalanceInfo] = useState<ActualBalanceInfo | null>(null)
+
+  // Fetch accountId and actualBalanceInfo when account changes
+  useEffect(() => {
+    if (!open || !account?.bookieName) {
+      setAccountId(null)
+      setActualBalanceInfo(null)
+      return
+    }
+
+    const fetchAccountData = async () => {
+      setAccountIdLoading(true)
+      try {
+        const result = await getAccountByBookieName({
+          data: {
+            bookieName: account.bookieName,
+            profileId,
+          },
+        })
+        const fetchedAccountId = result?.accountId ?? null
+        setAccountId(fetchedAccountId)
+
+        // Fetch actual balance info if we have an account
+        if (fetchedAccountId) {
+          const balanceInfo = await getActualBalanceInfo({
+            data: { accountId: fetchedAccountId },
+          })
+          setActualBalanceInfo(balanceInfo)
+        }
+      } catch (err) {
+        console.error('Failed to fetch account data:', err)
+        setAccountId(null)
+        setActualBalanceInfo(null)
+      } finally {
+        setAccountIdLoading(false)
+      }
+    }
+
+    fetchAccountData()
+  }, [open, account?.bookieName, profileId])
+
+  // Handler for reconciliation - user enters what bookie shows, system auto-adjusts
+  const handleSaveActualBalance = async (newActualBalance: number) => {
+    console.log('handleSaveActualBalance called:', { newActualBalance, accountId, bookieName: account?.bookieName })
+
+    if (!accountId || !account?.bookieName) {
+      console.log('Missing accountId or bookieName, aborting')
+      return
+    }
+
+    // Calculate the difference between what user says bookie shows vs what we calculated
+    const calculatedBalance = actualBalanceInfo?.calculatedBalance ?? 0
+    const difference = newActualBalance - calculatedBalance
+    console.log('Reconciliation:', { calculatedBalance, newActualBalance, difference })
+
+    // If there's a difference, create an adjustment entry to match
+    if (Math.abs(difference) > 0.01) {
+      console.log('Creating adjustment for difference:', difference)
+      await onAdjustBalance(account.bookieName, newActualBalance, 'Balance reconciliation')
+      console.log('Adjustment created')
+    }
+
+    // Update the actual balance record
+    console.log('Updating actual balance record...')
+    const result = await updateActualBalance({
+      data: {
+        accountId,
+        actualBalance: newActualBalance,
+        profileId,
+      },
+    })
+    console.log('updateActualBalance result:', result)
+
+    // Update local state - after adjustment, calculated should match actual
+    setActualBalanceInfo({
+      accountId: result.accountId,
+      calculatedBalance: newActualBalance, // After adjustment, this matches
+      actualBalance: result.actualBalance,
+      actualBalanceAt: result.actualBalanceAt,
+      variance: 0, // No variance after reconciliation
+    })
+    console.log('Reconciliation complete')
+  }
 
   if (!account) {
     return null
@@ -97,35 +162,7 @@ export function AccountDetailSheet({
       ? account.overrideValue
       : account.currentBalance
 
-  // Calculate summary stats from entries
-  const stats = entries.reduce(
-    (acc, entry) => {
-      const amount = entry.direction === 'in' ? entry.amount : -entry.amount
-      switch (entry.entryType) {
-        case 'DEPOSIT':
-          acc.deposits += entry.amount
-          break
-        case 'WITHDRAWAL':
-          acc.withdrawals += entry.amount
-          break
-        case 'BET_WIN':
-          acc.wins += entry.amount
-          break
-        case 'BET_LOSS':
-          acc.losses += entry.amount
-          break
-      }
-      return acc
-    },
-    { deposits: 0, withdrawals: 0, wins: 0, losses: 0 }
-  )
-
-  const handleAdjustConfirm = async (newBalance: number, reason: string) => {
-    await onAdjustBalance(account.bookieName, newBalance, reason)
-  }
-
   return (
-    <>
       <Drawer
         anchor="bottom"
         open={open}
@@ -171,7 +208,7 @@ export function AccountDetailSheet({
             <X size={20} />
           </IconButton>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            {account.bookieName}
+            {formatBookieName(account.bookieName)}
           </Typography>
           <Box sx={{ width: 32 }} /> {/* Spacer for centering */}
         </Box>
@@ -187,7 +224,7 @@ export function AccountDetailSheet({
               {/* Balance Section */}
               <Box sx={{ textAlign: 'center', mb: 3 }}>
                 <Typography variant="body2" color="text.secondary">
-                  Current Balance
+                  {mode === 'reconcile' ? 'System Balance' : 'Current Balance'}
                 </Typography>
                 <Typography
                   variant="h3"
@@ -199,126 +236,80 @@ export function AccountDetailSheet({
                 >
                   {formatLedgerCurrency(displayBalance)}
                 </Typography>
-                {account.isOverridden && (
-                  <Typography variant="caption" color="warning.main">
-                    Manual override active
-                  </Typography>
-                )}
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setAdjustDialogOpen(true)}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Adjust Balance
-                  </Button>
-                </Box>
               </Box>
 
-              <Divider sx={{ my: 2 }} />
-
-              {/* Summary Stats */}
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 3 }}>
-                <StatBox
-                  label="Deposits"
-                  value={formatLedgerCurrency(stats.deposits)}
-                  color="#1565c0"
-                />
-                <StatBox
-                  label="Withdrawals"
-                  value={formatLedgerCurrency(stats.withdrawals)}
-                  color="#2e7d32"
-                />
-                <StatBox
-                  label="Wins"
-                  value={`+${formatLedgerCurrency(stats.wins)}`}
-                  color="#2e7d32"
-                />
-                <StatBox
-                  label="Losses"
-                  value={`-${formatLedgerCurrency(stats.losses)}`}
-                  color="#c62828"
-                />
-              </Box>
-
-              {/* Net P&L */}
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  px: 2,
-                  py: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: account.totalPL >= 0 ? '#e8f5e9' : '#ffebee',
-                  mb: 3,
-                }}
-              >
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  Net P&L:
-                </Typography>
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 700,
-                    color: account.totalPL >= 0 ? '#2e7d32' : '#c62828',
-                  }}
-                >
-                  {account.totalPL >= 0 ? '+' : ''}{formatLedgerCurrency(account.totalPL)}
-                </Typography>
-              </Box>
-
-              <Divider sx={{ my: 2 }} />
-
-              {/* Recent Activity */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                  Recent Activity
-                </Typography>
-              </Box>
-
-              {entries.length === 0 ? (
+              {/* Reconciliation Section - Only in reconcile mode */}
+              {mode === 'reconcile' && (
                 <Box
                   sx={{
-                    textAlign: 'center',
-                    py: 4,
-                    color: 'text.secondary',
+                    mb: 3,
+                    p: 2,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 2,
                   }}
                 >
-                  <AlertCircle size={32} style={{ opacity: 0.5, marginBottom: 8 }} />
-                  <Typography variant="body2">No activity yet</Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    Reconcile with Bookie App
+                  </Typography>
+                  <ActualBalanceInput
+                    calculatedBalance={actualBalanceInfo?.calculatedBalance ?? displayBalance}
+                    actualBalance={actualBalanceInfo?.actualBalance ?? null}
+                    actualBalanceAt={actualBalanceInfo?.actualBalanceAt ?? null}
+                    onSave={handleSaveActualBalance}
+                    isLoading={accountIdLoading}
+                  />
                 </Box>
-              ) : (
-                <List disablePadding>
-                  {entries.slice(0, 5).map((entry) => (
-                    <LedgerEntryRow key={entry.id} entry={entry} />
-                  ))}
-                </List>
               )}
 
-              {entries.length > 5 && onViewAllActivity && (
-                <Button
-                  fullWidth
-                  onClick={onViewAllActivity}
-                  sx={{ mt: 2, borderRadius: 2 }}
-                  endIcon={<ChevronRight size={16} />}
-                >
-                  View All Activity ({entries.length})
-                </Button>
+              {/* Net P&L - Only in performance mode */}
+              {mode === 'performance' && (
+                <>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: 2,
+                      backgroundColor: account.totalPL >= 0 ? '#e8f5e9' : '#ffebee',
+                      mb: 3,
+                    }}
+                  >
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      Net P&L:
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{
+                        fontWeight: 700,
+                        color: account.totalPL >= 0 ? '#2e7d32' : '#c62828',
+                      }}
+                    >
+                      {account.totalPL >= 0 ? '+' : ''}{formatLedgerCurrency(account.totalPL)}
+                    </Typography>
+                  </Box>
+
+                  {/* Transaction History */}
+                  {accountId && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                        Transaction History
+                      </Typography>
+                      <JournalEntryList
+                        accountId={accountId}
+                        profileId={profileId}
+                        pageSize={10}
+                      />
+                    </Box>
+                  )}
+                </>
               )}
             </>
           )}
         </Box>
       </Drawer>
-
-      <AdjustBalanceDialog
-        open={adjustDialogOpen}
-        onClose={() => setAdjustDialogOpen(false)}
-        onConfirm={handleAdjustConfirm}
-        bookieName={account.bookieName}
-        currentBalance={displayBalance}
-      />
-    </>
   )
 }
 
@@ -326,98 +317,12 @@ export function AccountDetailSheet({
 // Sub-Components
 // ============================================================================
 
-function StatBox({ label, value, color }: { label: string; value: string; color: string }) {
-  return (
-    <Box
-      sx={{
-        textAlign: 'center',
-        p: 1.5,
-        borderRadius: 2,
-        backgroundColor: '#f5f5f5',
-      }}
-    >
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, color }}>
-        {value}
-      </Typography>
-    </Box>
-  )
-}
-
-function LedgerEntryRow({ entry }: { entry: LedgerEntry }) {
-  const config = LEDGER_ENTRY_CONFIG[entry.entryType]
-  const isPositive = entry.direction === 'in'
-
-  return (
-    <ListItem
-      sx={{
-        px: 0,
-        py: 1,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <ListItemIcon sx={{ minWidth: 40 }}>
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            backgroundColor: `${config.color}22`,
-            color: config.color,
-          }}
-        >
-          {entryIconMap[entry.entryType]}
-        </Box>
-      </ListItemIcon>
-      <ListItemText
-        primary={
-          <Typography variant="body2" sx={{ fontWeight: 500 }}>
-            {entry.description || config.label}
-          </Typography>
-        }
-        secondary={
-          <Typography variant="caption" color="text.secondary">
-            {new Date(entry.date).toLocaleDateString('en-AU', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </Typography>
-        }
-      />
-      <Typography
-        variant="body2"
-        sx={{
-          fontWeight: 600,
-          color: isPositive ? '#2e7d32' : '#c62828',
-        }}
-      >
-        {isPositive ? '+' : '-'}{formatLedgerCurrency(entry.amount)}
-      </Typography>
-    </ListItem>
-  )
-}
-
 function LoadingSkeleton() {
   return (
-    <>
-      <Box sx={{ textAlign: 'center', mb: 3 }}>
-        <Skeleton variant="text" width={100} sx={{ mx: 'auto' }} />
-        <Skeleton variant="text" width={150} height={60} sx={{ mx: 'auto' }} />
-        <Skeleton variant="rectangular" width={120} height={36} sx={{ mx: 'auto', mt: 2, borderRadius: 2 }} />
-      </Box>
-      <Divider sx={{ my: 2 }} />
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} variant="rectangular" height={60} sx={{ borderRadius: 2 }} />
-        ))}
-      </Box>
-    </>
+    <Box sx={{ textAlign: 'center', mb: 3 }}>
+      <Skeleton variant="text" width={100} sx={{ mx: 'auto' }} />
+      <Skeleton variant="text" width={150} height={60} sx={{ mx: 'auto' }} />
+      <Skeleton variant="rectangular" width={120} height={36} sx={{ mx: 'auto', mt: 2, borderRadius: 2 }} />
+    </Box>
   )
 }

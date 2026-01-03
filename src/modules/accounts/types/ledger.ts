@@ -89,6 +89,33 @@ export interface AccountBalance {
 }
 
 /**
+ * Grouped bookie account data with cash/bonus split
+ * Used by AccountCard to display detailed balance breakdown
+ */
+export interface BookieAccountData {
+  /** Bookie/exchange name */
+  bookieName: string
+  /** Bookie ID from database */
+  bookieId: number | null
+  /** Whether this is an exchange (Betfair, Smarkets) */
+  isExchange: boolean
+  /** Cash balance (from BOOKIE_CASH or BETFAIR_AVAILABLE) */
+  cashBalance: number
+  /** Bonus balance (from BOOKIE_BONUS, 0 for exchanges) */
+  bonusBalance: number
+  /** Total balance (cash + bonus) */
+  totalBalance: number
+  /** Total P&L from income/expense accounts (includes bonus deposit match income) */
+  totalPL: number
+  /** Whether calculated balance differs from actual */
+  hasVariance: boolean
+  /** Account needs user attention */
+  needsAttention: boolean
+  /** Variance amount: actual - calculated (null if no actual balance set) */
+  varianceAmount?: number | null
+}
+
+/**
  * Summary of ledger data for a date range
  */
 export interface LedgerSummary {
@@ -235,8 +262,26 @@ export const LEDGER_ENTRY_CONFIG: Record<LedgerEntryType, LedgerEntryTypeConfig>
 
 /**
  * Account filter options for the UI
+ * - 'all': Show all accounts
+ * - 'bookies': Show only bookie accounts
+ * - 'exchange': Show only exchange accounts
+ * - 'attention': Show accounts needing attention (variance detected)
  */
-export type AccountFilter = 'all' | 'bookies' | 'exchange'
+export type AccountFilter = 'all' | 'bookies' | 'exchange' | 'attention'
+
+/**
+ * Large variance threshold in dollars
+ * Only variances >= this amount show a count badge on the Attention chip
+ * Smaller variances are silent (only visible when filter is active)
+ */
+export const LARGE_VARIANCE_THRESHOLD = 500
+
+/**
+ * Type guard to check if a string is a valid AccountFilter
+ */
+export function isValidAccountFilter(value: string): value is AccountFilter {
+  return ['all', 'bookies', 'exchange', 'attention'].includes(value)
+}
 
 /**
  * Time period options for summaries
