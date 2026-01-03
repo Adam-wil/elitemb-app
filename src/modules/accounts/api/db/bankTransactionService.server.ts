@@ -10,8 +10,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { Prisma, JournalEntryType, BetType } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 import {
   provisionBookieAccounts,
   provisionBankAccount,
@@ -104,6 +109,7 @@ function mapToJournalEntryWithLines(entry: {
 export const recordBankTransaction = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordBankTransactionInput) => input)
   .handler(async ({ data }): Promise<RecordBankTransactionResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       type,
@@ -328,6 +334,7 @@ export const getBankTransactions = createServerFn({ method: 'GET' })
     }) => input
   )
   .handler(async ({ data }): Promise<JournalEntryWithLines[]> => {
+    const prisma = await getPrisma()
     const { profileId, bankAccountId, bookieId, fromDate, toDate, limit } = data
 
     // Build where clause
@@ -398,6 +405,7 @@ export const getBankTransactionSummary = createServerFn({ method: 'GET' })
     }) => input
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId, fromDate, toDate } = data
 
     const where: Prisma.JournalEntryWhereInput = {
@@ -486,6 +494,7 @@ export const getBankTransactionSummary = createServerFn({ method: 'GET' })
 export const recordBetfairTransaction = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordBetfairTransactionInput) => input)
   .handler(async ({ data }): Promise<RecordBetfairTransactionResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       type,
@@ -672,6 +681,7 @@ export const recordBetfairTransaction = createServerFn({ method: 'POST' })
 export const settlePendingBetfairDeposit = createServerFn({ method: 'POST' })
   .inputValidator((input: SettlePendingBetfairDepositInput) => input)
   .handler(async ({ data }): Promise<SettlePendingBetfairDepositResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       pendingJournalEntryId,
@@ -781,6 +791,7 @@ export const settlePendingBetfairDeposit = createServerFn({ method: 'POST' })
 export const getPendingBetfairDeposits = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }): Promise<JournalEntryWithLines[]> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     const entries = await prisma.journalEntry.findMany({
@@ -811,6 +822,7 @@ export const getBetfairTransactionSummary = createServerFn({ method: 'GET' })
     }) => input
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId, fromDate, toDate } = data
 
     const where: Prisma.JournalEntryWhereInput = {

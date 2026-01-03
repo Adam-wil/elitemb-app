@@ -5,25 +5,16 @@
  * Used for on-demand provisioning of bookie and bank accounts.
  */
 
-import prisma from '@/lib/prisma'
+import { ACCOUNT_CODE_RANGES, type AccountCodeRange } from './accountCodeRanges'
 
-/**
- * Account code ranges for different account types
- */
-export const ACCOUNT_CODE_RANGES = {
-  BOOKIE_CASH: { start: '1001', end: '1199' },
-  BOOKIE_BONUS: { start: '1201', end: '1299' },
-  BANK: { start: '1401', end: '1499' },
-  BETFAIR_AVAILABLE: { start: '1501', end: '1599' },
-  PENDING_BETFAIR_DEPOSIT: { start: '2001', end: '2099' },
-  // Per-bookie income/expense accounts (children of parent system accounts)
-  RACING_INCOME: { start: '4101', end: '4199' },
-  BONUS_DEPOSIT_MATCH_RACING_INCOME: { start: '4201', end: '4299' },
-  BONUS_DEPOSIT_MATCH_SPORTS_INCOME: { start: '4301', end: '4399' }, // Reserved for future sports module
-  RACING_EXPENSE: { start: '5101', end: '5199' },
-} as const
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
-export type AccountCodeRange = keyof typeof ACCOUNT_CODE_RANGES
+// Re-export constants for server-side consumers
+export { ACCOUNT_CODE_RANGES, type AccountCodeRange } from './accountCodeRanges'
 
 /**
  * Generate the next available account code within a range
@@ -39,6 +30,8 @@ export async function generateNextAccountCode(
   rangeStart: string,
   rangeEnd: string
 ): Promise<string> {
+  const prisma = await getPrisma()
+
   // Find the highest code currently in use within the range
   const existing = await prisma.account.findMany({
     where: {

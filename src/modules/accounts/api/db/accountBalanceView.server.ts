@@ -8,8 +8,14 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { AccountBalanceView } from '../../types'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
 import type { AccountType, AccountSubType } from '@prisma/client'
 
 // ============================================================================
@@ -22,6 +28,7 @@ import type { AccountType, AccountSubType } from '@prisma/client'
  * but the code works correctly at runtime.
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let user: any = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
@@ -68,6 +75,7 @@ async function getDefaultProfileId(): Promise<string> {
 export const getAccountBalances = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     const results = await prisma.$queryRaw<AccountBalanceView[]>`
@@ -85,6 +93,7 @@ export const getAccountBalances = createServerFn({ method: 'GET' })
 export const getAccountBalancesByType = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string; type: AccountType }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId, type } = data
 
     const results = await prisma.$queryRaw<AccountBalanceView[]>`
@@ -103,6 +112,7 @@ export const getAccountBalancesByType = createServerFn({ method: 'GET' })
 export const getAccountBalancesBySubType = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string; subType: AccountSubType }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId, subType } = data
 
     const results = await prisma.$queryRaw<AccountBalanceView[]>`
@@ -121,6 +131,7 @@ export const getAccountBalancesBySubType = createServerFn({ method: 'GET' })
 export const getAccountBalance = createServerFn({ method: 'GET' })
   .inputValidator((d: { accountId: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { accountId } = data
 
     const results = await prisma.$queryRaw<AccountBalanceView[]>`
@@ -138,6 +149,7 @@ export const getAccountBalance = createServerFn({ method: 'GET' })
 export const getBalanceSummaryByType = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     const results = await prisma.$queryRaw<
@@ -162,6 +174,7 @@ export const getBalanceSummaryByType = createServerFn({ method: 'GET' })
 export const getBookieAccountBalances = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     const results = await prisma.$queryRaw<AccountBalanceView[]>`
@@ -203,6 +216,7 @@ export interface BalanceSummaryCardData {
 export const getBalanceSummaryForCard = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId?: string }) => d)
   .handler(async ({ data }): Promise<BalanceSummaryCardData> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Query total balance from operational accounts (BOOKIE_CASH, BOOKIE_BONUS, BETFAIR_AVAILABLE)
@@ -292,6 +306,7 @@ interface GroupedBalanceRow {
 export const getBookieBalancesGrouped = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId?: string }) => d)
   .handler(async ({ data }): Promise<BookieAccountData[]> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Query grouped balances by bookieId
@@ -402,6 +417,7 @@ export const getAccountByBookieName = createServerFn({ method: 'GET' })
     (d: { bookieName: string; profileId?: string; subType?: AccountSubType }) => d
   )
   .handler(async ({ data }): Promise<BookieAccountInfo | null> => {
+    const prisma = await getPrisma()
     const { bookieName, subType } = data
     const profileId = data.profileId || (await getDefaultProfileId())
 
@@ -468,6 +484,7 @@ export const updateActualBalance = createServerFn({ method: 'POST' })
     (d: { accountId: string; actualBalance: number; profileId?: string }) => d
   )
   .handler(async ({ data }): Promise<UpdateActualBalanceResult> => {
+    const prisma = await getPrisma()
     const { accountId, actualBalance } = data
     const profileId = data.profileId || (await getDefaultProfileId())
 
@@ -518,6 +535,7 @@ export interface ActualBalanceInfo {
 export const getActualBalanceInfo = createServerFn({ method: 'GET' })
   .inputValidator((d: { accountId: string }) => d)
   .handler(async ({ data }): Promise<ActualBalanceInfo | null> => {
+    const prisma = await getPrisma()
     const { accountId } = data
 
     // Get account with actual balance fields

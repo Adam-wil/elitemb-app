@@ -10,8 +10,14 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { RaceOutcome } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
 import type { LedgerEntryType, LedgerDirection } from '../../types/ledger'
 
 // ============================================================================
@@ -22,6 +28,8 @@ import type { LedgerEntryType, LedgerDirection } from '../../types/ledger'
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
+
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -115,6 +123,7 @@ export const syncTrackerEntriesToLedger = createServerFn({ method: 'POST' })
     (input: { startDate?: string; endDate?: string; forceResync?: boolean }) => input
   )
   .handler(async ({ data }): Promise<SyncTrackerResult> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const result: SyncTrackerResult = { synced: 0, skipped: 0, errors: [], entries: [] }
 
@@ -287,6 +296,7 @@ export const syncBankTransactionsToLedger = createServerFn({ method: 'POST' })
     (input: { transactions: BankTransactionInput[]; forceResync?: boolean }) => input
   )
   .handler(async ({ data }): Promise<SyncBankResult> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const result: SyncBankResult = { synced: 0, skipped: 0, errors: [], entries: [] }
 
@@ -428,6 +438,7 @@ export interface SyncBonusResult {
 export const syncBonusesToLedger = createServerFn({ method: 'POST' })
   .inputValidator((input: { bonuses: BonusInput[]; forceResync?: boolean }) => input)
   .handler(async ({ data }): Promise<SyncBonusResult> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const result: SyncBonusResult = { synced: 0, skipped: 0, errors: [], entries: [] }
 
@@ -569,6 +580,7 @@ export const getLedgerSyncStatus = createServerFn({ method: 'GET' })
     bankTransactions: { synced: number }
     bonuses: { synced: number }
   }> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     // Count tracker entries
@@ -607,6 +619,7 @@ export const getLedgerSyncStatus = createServerFn({ method: 'GET' })
 export const clearSyncedLedgerEntries = createServerFn({ method: 'POST' })
   .inputValidator((input: { source?: 'tracker' | 'bank' | 'bonus' | 'all' }) => input)
   .handler(async ({ data }): Promise<{ deleted: number }> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const source = data.source || 'all'
 

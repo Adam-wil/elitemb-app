@@ -8,9 +8,27 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import { SYSTEM_ACCOUNTS } from '../../constants/systemAccounts'
+
 import type { Account } from '@prisma/client'
+import type { SerializedAccount } from './accountProvisioner.server'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
+/**
+ * Convert Prisma Account to serializable format
+ * Duplicated from accountProvisioner.server.ts to avoid circular imports
+ */
+function serializeAccount(account: Account): SerializedAccount {
+  return {
+    ...account,
+    actualBalance: account.actualBalance ? Number(account.actualBalance) : null,
+  }
+}
 
 /**
  * Seed all system accounts for a profile
@@ -27,7 +45,8 @@ import type { Account } from '@prisma/client'
  */
 export const seedSystemAccounts = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId: string }) => d)
-  .handler(async ({ data }): Promise<Account[]> => {
+  .handler(async ({ data }): Promise<SerializedAccount[]> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     // Verify profile exists
@@ -72,7 +91,7 @@ export const seedSystemAccounts = createServerFn({ method: 'POST' })
       }
     }
 
-    return results
+    return results.map(serializeAccount)
   })
 
 /**
@@ -81,6 +100,7 @@ export const seedSystemAccounts = createServerFn({ method: 'POST' })
 export const hasSystemAccounts = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }): Promise<boolean> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     const count = await prisma.account.count({
@@ -98,14 +118,17 @@ export const hasSystemAccounts = createServerFn({ method: 'GET' })
  */
 export const getSystemAccounts = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
-  .handler(async ({ data }): Promise<Account[]> => {
+  .handler(async ({ data }): Promise<SerializedAccount[]> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
-    return prisma.account.findMany({
+    const accounts = await prisma.account.findMany({
       where: {
         profileId,
         isSystem: true,
       },
       orderBy: { code: 'asc' },
     })
+
+    return accounts.map(serializeAccount)
   })

@@ -13,8 +13,14 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import { seedSystemAccounts } from './accountSeeder.server'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
 import {
   recordMatchedBetPlaced,
   recordMatchedBetBackWins,
@@ -50,6 +56,7 @@ interface DevSeedResult {
  * Get or create the default profile for seeding
  */
 async function getOrCreateDefaultProfile(): Promise<string> {
+  const prisma = await getPrisma()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let user: any = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
@@ -95,6 +102,7 @@ async function getOrCreateBookie(
   name: string,
   isExchange: boolean
 ): Promise<number> {
+  const prisma = await getPrisma()
   const normalizedName = name.toLowerCase().replace(/\s+/g, '-')
 
   let bookie = await prisma.bookie.findFirst({
@@ -133,6 +141,7 @@ async function getOrCreateBookie(
 export const seedDevData = createServerFn({ method: 'POST' })
   .inputValidator((d: { force?: boolean }) => d)
   .handler(async ({ data }): Promise<DevSeedResult> => {
+    const prisma = await getPrisma()
     const { force = false } = data
 
     // Get or create default profile
@@ -630,6 +639,7 @@ export const seedDevData = createServerFn({ method: 'POST' })
 export const clearDevData = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId?: string; includeSystemAccounts?: boolean }) => d)
   .handler(async ({ data }): Promise<{ cleared: boolean; message: string }> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getOrCreateDefaultProfile())
     const includeSystemAccounts = data.includeSystemAccounts ?? false
 

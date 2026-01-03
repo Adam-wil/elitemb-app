@@ -8,7 +8,12 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Server Functions
@@ -18,6 +23,7 @@ import prisma from '@/lib/prisma'
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -57,6 +63,7 @@ async function getDefaultProfileId(): Promise<string> {
  * Get all bookies
  */
 export const getAllBookies = createServerFn({ method: 'GET' }).handler(async () => {
+  const prisma = await getPrisma()
   const bookies = await prisma.bookie.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' },
@@ -71,6 +78,7 @@ export const getAllBookies = createServerFn({ method: 'GET' }).handler(async () 
 export const getBookieById = createServerFn({ method: 'GET' })
   .inputValidator((d: { bookieId: number }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const bookie = await prisma.bookie.findUnique({
       where: { id: data.bookieId },
     })
@@ -84,6 +92,7 @@ export const getBookieById = createServerFn({ method: 'GET' })
 export const getBookieByName = createServerFn({ method: 'GET' })
   .inputValidator((d: { name: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const normalizedName = data.name.toLowerCase().trim()
 
     const bookie = await prisma.bookie.findUnique({
@@ -99,6 +108,7 @@ export const getBookieByName = createServerFn({ method: 'GET' })
 export const searchBookies = createServerFn({ method: 'GET' })
   .inputValidator((d: { query: string; limit?: number }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const bookies = await prisma.bookie.findMany({
       where: {
         isActive: true,
@@ -120,6 +130,7 @@ export const searchBookies = createServerFn({ method: 'GET' })
 export const getBookieNote = createServerFn({ method: 'GET' })
   .inputValidator((d: { bookieId: number }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const note = await prisma.bookieNote.findUnique({
@@ -140,6 +151,7 @@ export const getBookieNote = createServerFn({ method: 'GET' })
 export const saveBookieNote = createServerFn({ method: 'POST' })
   .inputValidator((d: { bookieId: number; content: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const note = await prisma.bookieNote.upsert({
@@ -168,6 +180,7 @@ export const saveBookieNote = createServerFn({ method: 'POST' })
 export const deleteBookieNote = createServerFn({ method: 'POST' })
   .inputValidator((d: { bookieId: number }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     await prisma.bookieNote.deleteMany({
@@ -184,6 +197,7 @@ export const deleteBookieNote = createServerFn({ method: 'POST' })
  * Get all bookie notes for current profile
  */
 export const getAllBookieNotes = createServerFn({ method: 'GET' }).handler(async () => {
+  const prisma = await getPrisma()
   const profileId = await getDefaultProfileId()
 
   const notes = await prisma.bookieNote.findMany({
@@ -202,6 +216,7 @@ export const getAllBookieNotes = createServerFn({ method: 'GET' }).handler(async
  * Get state commission rates
  */
 export const getStateCommissionRates = createServerFn({ method: 'GET' }).handler(async () => {
+  const prisma = await getPrisma()
   const rates = await prisma.stateCommissionRate.findMany({
     orderBy: { code: 'asc' },
   })
@@ -215,6 +230,7 @@ export const getStateCommissionRates = createServerFn({ method: 'GET' }).handler
 export const getTracksByState = createServerFn({ method: 'GET' })
   .inputValidator((d: { stateCode: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const tracks = await prisma.track.findMany({
       where: {
         stateCode: data.stateCode,
@@ -230,6 +246,7 @@ export const getTracksByState = createServerFn({ method: 'GET' })
  * Get all tracks
  */
 export const getAllTracks = createServerFn({ method: 'GET' }).handler(async () => {
+  const prisma = await getPrisma()
   const tracks = await prisma.track.findMany({
     where: { isActive: true },
     include: {
@@ -249,6 +266,7 @@ export const getAllTracks = createServerFn({ method: 'GET' }).handler(async () =
 export const getTrackByName = createServerFn({ method: 'GET' })
   .inputValidator((d: { name: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const track = await prisma.track.findFirst({
       where: {
         name: { equals: data.name.toUpperCase(), mode: 'insensitive' },

@@ -8,35 +8,59 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
-import { generateCodeForType } from '../../utils/accountCodeGenerator'
+import { generateCodeForType } from '../../utils/accountCodeGenerator.server'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
 import type { Account } from '@prisma/client'
 
 // ============================================================================
 // Types
 // ============================================================================
 
+/**
+ * Serialized Account type for TanStack Start RPC
+ * Converts Prisma Decimal fields to number (Decimal has methods that can't be serialized)
+ */
+export type SerializedAccount = Omit<Account, 'actualBalance'> & {
+  actualBalance: number | null
+}
+
+/**
+ * Convert Prisma Account to serializable format
+ */
+function serializeAccount(account: Account): SerializedAccount {
+  return {
+    ...account,
+    actualBalance: account.actualBalance ? Number(account.actualBalance) : null,
+  }
+}
+
 export interface ProvisionBookieAccountsResult {
-  cashAccount: Account
-  bonusAccount: Account
-  racingIncomeAccount: Account
-  racingExpenseAccount: Account
-  bonusDepositMatchIncomeAccount: Account
+  cashAccount: SerializedAccount
+  bonusAccount: SerializedAccount
+  racingIncomeAccount: SerializedAccount
+  racingExpenseAccount: SerializedAccount
+  bonusDepositMatchIncomeAccount: SerializedAccount
   created: boolean
 }
 
 export interface ProvisionBankAccountResult {
-  bankAccount: Account
+  bankAccount: SerializedAccount
   created: boolean
 }
 
 export interface ProvisionBetfairAccountsResult {
-  availableAccount: Account
+  availableAccount: SerializedAccount
   created: boolean
 }
 
 export interface ProvisionPendingBetfairDepositResult {
-  pendingAccount: Account
+  pendingAccount: SerializedAccount
   created: boolean
 }
 
@@ -64,6 +88,7 @@ export interface ProvisionPendingBetfairDepositResult {
 export const provisionBookieAccounts = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId: string; bookieId: number }) => d)
   .handler(async ({ data }): Promise<ProvisionBookieAccountsResult> => {
+    const prisma = await getPrisma()
     const { profileId, bookieId } = data
 
     // Check if all 5 accounts already provisioned
@@ -85,11 +110,11 @@ export const provisionBookieAccounts = createServerFn({ method: 'POST' })
 
       if (cashAccount && bonusAccount && racingIncomeAccount && racingExpenseAccount && bonusDepositMatchIncomeAccount) {
         return {
-          cashAccount,
-          bonusAccount,
-          racingIncomeAccount,
-          racingExpenseAccount,
-          bonusDepositMatchIncomeAccount,
+          cashAccount: serializeAccount(cashAccount),
+          bonusAccount: serializeAccount(bonusAccount),
+          racingIncomeAccount: serializeAccount(racingIncomeAccount),
+          racingExpenseAccount: serializeAccount(racingExpenseAccount),
+          bonusDepositMatchIncomeAccount: serializeAccount(bonusDepositMatchIncomeAccount),
           created: false,
         }
       }
@@ -146,7 +171,14 @@ export const provisionBookieAccounts = createServerFn({ method: 'POST' })
     // Determine if any were created (not all existed before)
     const created = existing.length < 5
 
-    return { cashAccount, bonusAccount, racingIncomeAccount, racingExpenseAccount, bonusDepositMatchIncomeAccount, created }
+    return {
+      cashAccount: serializeAccount(cashAccount),
+      bonusAccount: serializeAccount(bonusAccount),
+      racingIncomeAccount: serializeAccount(racingIncomeAccount),
+      racingExpenseAccount: serializeAccount(racingExpenseAccount),
+      bonusDepositMatchIncomeAccount: serializeAccount(bonusDepositMatchIncomeAccount),
+      created,
+    }
   })
 
 /**
@@ -154,16 +186,18 @@ export const provisionBookieAccounts = createServerFn({ method: 'POST' })
  */
 export const getBookieAccounts = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
-  .handler(async ({ data }): Promise<Account[]> => {
+  .handler(async ({ data }): Promise<SerializedAccount[]> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
-    return prisma.account.findMany({
+    const accounts = await prisma.account.findMany({
       where: {
         profileId,
         subType: { in: ['BOOKIE_CASH', 'BOOKIE_BONUS', 'RACING_INCOME', 'RACING_EXPENSE', 'BONUS_DEPOSIT_MATCH_RACING_INCOME'] },
       },
       orderBy: [{ bookieName: 'asc' }, { subType: 'asc' }],
     })
+    return accounts.map(serializeAccount)
   })
 
 /**
@@ -175,12 +209,13 @@ export const getBookieAccountsByBookieId = createServerFn({ method: 'GET' })
     async ({
       data,
     }): Promise<{
-      cashAccount: Account | null
-      bonusAccount: Account | null
-      racingIncomeAccount: Account | null
-      racingExpenseAccount: Account | null
-      bonusDepositMatchIncomeAccount: Account | null
+      cashAccount: SerializedAccount | null
+      bonusAccount: SerializedAccount | null
+      racingIncomeAccount: SerializedAccount | null
+      racingExpenseAccount: SerializedAccount | null
+      bonusDepositMatchIncomeAccount: SerializedAccount | null
     }> => {
+      const prisma = await getPrisma()
       const { profileId, bookieId } = data
 
       const accounts = await prisma.account.findMany({
@@ -191,12 +226,17 @@ export const getBookieAccountsByBookieId = createServerFn({ method: 'GET' })
         },
       })
 
+      const find = (subType: string) => {
+        const acc = accounts.find((a) => a.subType === subType)
+        return acc ? serializeAccount(acc) : null
+      }
+
       return {
-        cashAccount: accounts.find((a) => a.subType === 'BOOKIE_CASH') ?? null,
-        bonusAccount: accounts.find((a) => a.subType === 'BOOKIE_BONUS') ?? null,
-        racingIncomeAccount: accounts.find((a) => a.subType === 'RACING_INCOME') ?? null,
-        racingExpenseAccount: accounts.find((a) => a.subType === 'RACING_EXPENSE') ?? null,
-        bonusDepositMatchIncomeAccount: accounts.find((a) => a.subType === 'BONUS_DEPOSIT_MATCH_RACING_INCOME') ?? null,
+        cashAccount: find('BOOKIE_CASH'),
+        bonusAccount: find('BOOKIE_BONUS'),
+        racingIncomeAccount: find('RACING_INCOME'),
+        racingExpenseAccount: find('RACING_EXPENSE'),
+        bonusDepositMatchIncomeAccount: find('BONUS_DEPOSIT_MATCH_RACING_INCOME'),
       }
     }
   )
@@ -216,6 +256,7 @@ export const getBookieAccountsByBookieId = createServerFn({ method: 'GET' })
 export const provisionBankAccount = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId: string; bankName: string }) => d)
   .handler(async ({ data }): Promise<ProvisionBankAccountResult> => {
+    const prisma = await getPrisma()
     const { profileId, bankName } = data
 
     if (!bankName.trim()) {
@@ -233,7 +274,7 @@ export const provisionBankAccount = createServerFn({ method: 'POST' })
 
     if (existing) {
       return {
-        bankAccount: existing,
+        bankAccount: serializeAccount(existing),
         created: false,
       }
     }
@@ -255,7 +296,7 @@ export const provisionBankAccount = createServerFn({ method: 'POST' })
       },
     })
 
-    return { bankAccount, created: true }
+    return { bankAccount: serializeAccount(bankAccount), created: true }
   })
 
 /**
@@ -263,16 +304,18 @@ export const provisionBankAccount = createServerFn({ method: 'POST' })
  */
 export const getBankAccounts = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
-  .handler(async ({ data }): Promise<Account[]> => {
+  .handler(async ({ data }): Promise<SerializedAccount[]> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
-    return prisma.account.findMany({
+    const accounts = await prisma.account.findMany({
       where: {
         profileId,
         subType: 'BANK',
       },
       orderBy: { bankName: 'asc' },
     })
+    return accounts.map(serializeAccount)
   })
 
 // ============================================================================
@@ -292,6 +335,7 @@ export const getBankAccounts = createServerFn({ method: 'GET' })
 export const provisionBetfairAccounts = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }): Promise<ProvisionBetfairAccountsResult> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     // Check if already provisioned
@@ -304,7 +348,7 @@ export const provisionBetfairAccounts = createServerFn({ method: 'POST' })
 
     if (existing) {
       return {
-        availableAccount: existing,
+        availableAccount: serializeAccount(existing),
         created: false,
       }
     }
@@ -325,7 +369,7 @@ export const provisionBetfairAccounts = createServerFn({ method: 'POST' })
       },
     })
 
-    return { availableAccount, created: true }
+    return { availableAccount: serializeAccount(availableAccount), created: true }
   })
 
 /**
@@ -333,15 +377,17 @@ export const provisionBetfairAccounts = createServerFn({ method: 'POST' })
  */
 export const getBetfairAccount = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
-  .handler(async ({ data }): Promise<Account | null> => {
+  .handler(async ({ data }): Promise<SerializedAccount | null> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
-    return prisma.account.findFirst({
+    const account = await prisma.account.findFirst({
       where: {
         profileId,
         subType: 'BETFAIR_AVAILABLE',
       },
     })
+    return account ? serializeAccount(account) : null
   })
 
 /**
@@ -357,6 +403,7 @@ export const getBetfairAccount = createServerFn({ method: 'GET' })
 export const provisionPendingBetfairDepositAccount = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId: string }) => d)
   .handler(async ({ data }): Promise<ProvisionPendingBetfairDepositResult> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
     // Check if already provisioned
@@ -369,7 +416,7 @@ export const provisionPendingBetfairDepositAccount = createServerFn({ method: 'P
 
     if (existing) {
       return {
-        pendingAccount: existing,
+        pendingAccount: serializeAccount(existing),
         created: false,
       }
     }
@@ -390,7 +437,7 @@ export const provisionPendingBetfairDepositAccount = createServerFn({ method: 'P
       },
     })
 
-    return { pendingAccount, created: true }
+    return { pendingAccount: serializeAccount(pendingAccount), created: true }
   })
 
 /**
@@ -398,13 +445,15 @@ export const provisionPendingBetfairDepositAccount = createServerFn({ method: 'P
  */
 export const getPendingBetfairDepositAccount = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId: string }) => d)
-  .handler(async ({ data }): Promise<Account | null> => {
+  .handler(async ({ data }): Promise<SerializedAccount | null> => {
+    const prisma = await getPrisma()
     const { profileId } = data
 
-    return prisma.account.findFirst({
+    const account = await prisma.account.findFirst({
       where: {
         profileId,
         subType: 'PENDING_BETFAIR_DEPOSIT',
       },
     })
+    return account ? serializeAccount(account) : null
   })

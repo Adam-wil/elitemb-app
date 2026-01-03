@@ -5,8 +5,13 @@
  * Only parent entries create journal entries; child legs store details only.
  */
 
-import prisma from '@/lib/prisma'
 import type { RacingTrackerEntry, LayManagerEntry, RaceOutcome } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Types
@@ -154,6 +159,7 @@ export async function getMultiLegChildren(
   parentId: string,
   model: 'racing' | 'lay'
 ): Promise<Array<RacingTrackerEntry | LayManagerEntry>> {
+  const prisma = await getPrisma()
   if (model === 'racing') {
     return prisma.racingTrackerEntry.findMany({
       where: { parentBetId: parentId },
@@ -180,6 +186,7 @@ export async function getMultiLegParent(
 ): Promise<RacingTrackerEntry | LayManagerEntry | null> {
   if (!childEntry.parentBetId) return null
 
+  const prisma = await getPrisma()
   if (model === 'racing') {
     return prisma.racingTrackerEntry.findUnique({
       where: { id: childEntry.parentBetId },

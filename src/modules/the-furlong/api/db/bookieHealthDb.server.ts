@@ -8,13 +8,18 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type {
   RatioTimeWindow,
   BookieAccountStatus,
   BookieUsageStats,
   ChipRatioStatus,
 } from '../../types/bookieHealth'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Helper Functions
@@ -24,6 +29,7 @@ import type {
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -95,6 +101,7 @@ function getTimeWindowStartDate(timeWindow: RatioTimeWindow): Date {
  */
 export const getAllRatioConfigs = createServerFn({ method: 'GET' }).handler(
   async () => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const configs = await prisma.bookieRatioConfig.findMany({
@@ -122,6 +129,7 @@ export const getAllRatioConfigs = createServerFn({ method: 'GET' }).handler(
 export const getRatioConfigByBookie = createServerFn({ method: 'GET' })
   .inputValidator((d: { bookieId: number }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const config = await prisma.bookieRatioConfig.findUnique({
@@ -152,6 +160,7 @@ export const upsertRatioConfig = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const config = await prisma.bookieRatioConfig.upsert({
@@ -192,6 +201,7 @@ export const updateBookieStatus = createServerFn({ method: 'POST' })
     (d: { bookieId: number; status: BookieAccountStatus; notes?: string }) => d
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const config = await prisma.bookieRatioConfig.upsert({
@@ -224,6 +234,7 @@ export const updateBookieStatus = createServerFn({ method: 'POST' })
 export const deleteRatioConfig = createServerFn({ method: 'POST' })
   .inputValidator((d: { bookieId: number }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     await prisma.bookieRatioConfig.deleteMany({
@@ -240,6 +251,7 @@ export const deleteRatioConfig = createServerFn({ method: 'POST' })
 export const getBookieUsageStats = createServerFn({ method: 'GET' })
   .inputValidator((d: { bookieIds?: number[] }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     // Get all ratio configs
@@ -265,7 +277,7 @@ export const getBookieUsageStats = createServerFn({ method: 'GET' })
       const entries = await prisma.racingTrackerEntry.findMany({
         where: {
           profileId,
-          backBookie: config.bookie.name,
+          backBookie: config.Bookie.name,
           date: { gte: startDate },
           outcome: { not: 'PENDING' }, // Only count completed bets
         },
@@ -300,8 +312,8 @@ export const getBookieUsageStats = createServerFn({ method: 'GET' })
       }
 
       stats.push({
-        bookieId: config.bookie.id,
-        bookieName: config.bookie.name,
+        bookieId: config.Bookie.id,
+        bookieName: config.Bookie.name,
         promoBets,
         nonPromoBets,
         totalBets: promoBets + nonPromoBets,
@@ -322,6 +334,7 @@ export const getBookieUsageStats = createServerFn({ method: 'GET' })
 export const getBookieUsageForPlanner = createServerFn({ method: 'GET' })
   .inputValidator((d: { bookieNames: string[] }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     if (data.bookieNames.length === 0) {
@@ -344,7 +357,7 @@ export const getBookieUsageForPlanner = createServerFn({ method: 'GET' })
         bookieId: { in: bookieIds },
       },
       include: {
-        bookie: { select: { id: true, name: true } },
+        Bookie: { select: { id: true, name: true } },
       },
     })
 
@@ -359,7 +372,7 @@ export const getBookieUsageForPlanner = createServerFn({ method: 'GET' })
       const entries = await prisma.racingTrackerEntry.findMany({
         where: {
           profileId,
-          backBookie: config.bookie.name,
+          backBookie: config.Bookie.name,
           date: { gte: startDate },
           outcome: { not: 'PENDING' },
         },
@@ -387,8 +400,8 @@ export const getBookieUsageForPlanner = createServerFn({ method: 'GET' })
         status = 'warning'
       }
 
-      usageMap[config.bookie.name] = {
-        bookieName: config.bookie.name,
+      usageMap[config.Bookie.name] = {
+        bookieName: config.Bookie.name,
         status,
         ratioDisplay: `${promoBets}/${nonPromoBets}`,
         tooltipText: `${promoBets} promo, ${nonPromoBets} non-promo (target: ${config.promoRatio}:${config.nonPromoRatio})`,
@@ -403,6 +416,7 @@ export const getBookieUsageForPlanner = createServerFn({ method: 'GET' })
  */
 export const getAllBookiesWithHealth = createServerFn({ method: 'GET' }).handler(
   async () => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     // Get all active bookies

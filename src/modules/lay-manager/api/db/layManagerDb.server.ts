@@ -8,8 +8,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { UnitTier, RaceOutcome } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 import { recordMatchedBetPlaced, recordMatchedBetBackWins, recordMatchedBetLayWins } from '@/modules/the-furlong/api/db/layManagerJournalHooks.server'
 
 // ============================================================================
@@ -67,6 +72,7 @@ export interface LayEntryUpdate {
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -108,6 +114,7 @@ async function getDefaultProfileId(): Promise<string> {
 export const getLayEntriesByDate = createServerFn({ method: 'GET' })
   .inputValidator((d: { date: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const date = new Date(data.date)
 
@@ -128,6 +135,7 @@ export const getLayEntriesByDate = createServerFn({ method: 'GET' })
 export const getLayEntriesByDateRange = createServerFn({ method: 'GET' })
   .inputValidator((d: { startDate: string; endDate: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const startDate = new Date(data.startDate)
     const endDate = new Date(data.endDate)
@@ -152,6 +160,7 @@ export const getLayEntriesByDateRange = createServerFn({ method: 'GET' })
 export const createLayEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entry: LayEntryInput; linkedBonusId?: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const { entry, linkedBonusId } = data
 
@@ -220,6 +229,7 @@ export const createLayEntry = createServerFn({ method: 'POST' })
 export const updateLayEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entryId: string; updates: LayEntryUpdate }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { entryId, updates } = data
 
     // Get current entry to check for outcome transitions
@@ -313,6 +323,7 @@ export const updateLayEntry = createServerFn({ method: 'POST' })
 export const deleteLayEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entryId: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     await prisma.layManagerEntry.delete({
       where: { id: data.entryId },
     })
@@ -335,6 +346,7 @@ export const batchUpdateLayOutcomes = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     // Get current entries to check for outcome transitions
     const entryIds = data.updates.map((u) => u.entryId)
     const currentEntries = await prisma.layManagerEntry.findMany({
@@ -435,6 +447,7 @@ export const batchUpdateLayOutcomes = createServerFn({ method: 'POST' })
 export const getLayManagerSummary = createServerFn({ method: 'GET' })
   .inputValidator((d: { startDate: string; endDate: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const startDate = new Date(data.startDate)
     const endDate = new Date(data.endDate)

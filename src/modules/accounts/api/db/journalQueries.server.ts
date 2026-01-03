@@ -6,8 +6,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { JournalEntryType, BetType, AccountType } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Types
@@ -96,6 +101,7 @@ export interface JournalEntryDetail {
 export const getJournalLinesForAccount = createServerFn({ method: 'GET' })
   .inputValidator((input: GetJournalLinesInput) => input)
   .handler(async ({ data }): Promise<JournalLineWithEntry[]> => {
+    const prisma = await getPrisma()
     const { accountId, limit = 50, offset = 0, startDate, endDate } = data
 
     // Get profile ID from input or use the account's profile
@@ -192,6 +198,7 @@ export const getJournalLinesForAccount = createServerFn({ method: 'GET' })
 export const getJournalEntryDetail = createServerFn({ method: 'GET' })
   .inputValidator((input: GetJournalEntryInput) => input)
   .handler(async ({ data }): Promise<JournalEntryDetail | null> => {
+    const prisma = await getPrisma()
     const { journalEntryId, profileId } = data
 
     // Build where clause - only include profileId if provided

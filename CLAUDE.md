@@ -175,6 +175,92 @@ console.log('Response keys:', Object.keys(response[0]))
 // Actual: { track: { name: string } }
 ```
 
+### "The requested module does not provide an export named 'default'" (Prisma/pg bundling error)
+
+**Error message in browser console:**
+```
+SyntaxError: The requested module '/node_modules/pg/lib/index.js' does not provide an export named 'default'
+```
+
+**What's happening:**
+
+When a React component imports from a `.server.ts` file (even just to call a `createServerFn()` function), Vite analyzes the ENTIRE file including all its top-level imports. This happens during client-side bundling, not just server-side.
+
+So if your server file has this at the top:
+
+```typescript
+import prisma from '@/lib/prisma.server'  // This imports pg, @prisma/adapter-pg, etc.
+```
+
+Vite follows that import chain all the way to the `pg` (PostgreSQL) package. The `pg` package is a Node.js-only CommonJS module that doesn't work in browsers. When Vite tries to bundle it for the client, it fails because `pg` doesn't have an ESM default export.
+
+**Why this is confusing:**
+
+You might think "but it's a `.server.ts` file and I'm using `createServerFn()` - shouldn't that stay on the server?" The RPC execution does stay on the server, but the import analysis happens at build time for both client and server bundles. Vite doesn't know that `prisma` is only used inside the handler until runtime.
+
+**The fix - use dynamic imports inside handlers:**
+
+Move the import INSIDE the handler function using dynamic `await import()`. This way, the import only happens at runtime on the server, not at build-time bundling:
+
+```typescript
+// BAD - top-level import gets analyzed and bundled for client
+import prisma from '@/lib/prisma.server'
+
+export const getDataServer = createServerFn({ method: 'GET' })
+  .handler(async () => {
+    return prisma.user.findMany()  // prisma was imported at top level
+  })
+
+// GOOD - dynamic import only runs at runtime on server
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
+export const getDataServer = createServerFn({ method: 'GET' })
+  .handler(async () => {
+    const prisma = await getPrisma()  // import happens here, at runtime
+    return prisma.user.findMany()
+  })
+```
+
+**The pattern for all server files:**
+
+Every `.server.ts` file that uses Prisma should have this helper at the top:
+
+```typescript
+import { createServerFn } from '@tanstack/react-start'
+// NO top-level prisma import!
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
+// Then in each handler:
+export const someServerFn = createServerFn({ method: 'GET' })
+  .handler(async ({ data }) => {
+    const prisma = await getPrisma()  // First line of every handler
+    // ... rest of handler using prisma
+  })
+```
+
+**Why Vite config changes don't work:**
+
+You might try these Vite config workarounds - none of them solve the root cause:
+
+- `ssr.external: ['pg', '@prisma/adapter-pg']` - Only affects SSR bundling, not client bundling
+- `ssr.noExternal` - Same issue, wrong scope
+- `optimizeDeps.exclude` - Prevents pre-bundling but doesn't stop import analysis
+- Custom Vite plugins to stub modules - Causes "missing export" errors downstream
+
+The only reliable fix is dynamic imports inside handlers.
+
+**Files affected:**
+
+All 23 `.server.ts` files in this project use this pattern. If you create a new server file that uses Prisma, follow this pattern or you'll get the same error.
+
 ---
 
 # Project: Elite MB Application (The Furlong)

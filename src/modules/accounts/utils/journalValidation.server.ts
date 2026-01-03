@@ -5,13 +5,18 @@
  * Returns structured validation results instead of throwing errors.
  */
 
-import prisma from '@/lib/prisma'
 import type {
   JournalLineInput,
   CreateJournalEntryInput,
   JournalValidationResult,
   JournalValidationError,
 } from '../types/journal'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Account Validation (Task 2)
@@ -24,6 +29,7 @@ export async function validateAccountsExist(
   profileId: string,
   accountIds: string[]
 ): Promise<JournalValidationError[]> {
+  const prisma = await getPrisma()
   const errors: JournalValidationError[] = []
   const uniqueIds = [...new Set(accountIds)]
 

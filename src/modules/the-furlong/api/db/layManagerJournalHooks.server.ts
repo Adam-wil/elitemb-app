@@ -8,10 +8,9 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import { provisionBookieAccounts, provisionBetfairAccounts } from '@/modules/accounts/api/db/accountProvisioner.server'
 import { reverseJournalEntry } from '@/modules/accounts/api/db/journalService.server'
-import { shouldCreateJournalEntry, isMultiLegParent } from '@/modules/the-furlong/utils/multiLegHelpers'
+import { shouldCreateJournalEntry, isMultiLegParent } from '@/modules/the-furlong/utils/multiLegHelpers.server'
 import type {
   RecordMatchedBetPlacedInput,
   RecordMatchedBetPlacedResult,
@@ -22,6 +21,12 @@ import type {
   JournalEntryWithLines,
 } from '@/modules/accounts/types/journal'
 import type { Prisma, JournalEntryType, BetType, AccountSubType } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Helper Functions
@@ -79,6 +84,7 @@ async function getSystemAccount(
   profileId: string,
   subType: AccountSubType
 ): Promise<{ id: string; code: string; name: string }> {
+  const prisma = await getPrisma()
   const account = await prisma.account.findFirst({
     where: {
       profileId,
@@ -144,6 +150,7 @@ function calculateLayLiability(layOdds: number, layStake: number): number {
 export const recordMatchedBetPlaced = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordMatchedBetPlacedInput) => input)
   .handler(async ({ data }): Promise<RecordMatchedBetPlacedResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       layManagerEntryId,
@@ -351,6 +358,7 @@ export const recordMatchedBetPlaced = createServerFn({ method: 'POST' })
 export const recordMatchedBetBackWins = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordMatchedBetBackWinsInput) => input)
   .handler(async ({ data }): Promise<RecordMatchedBetBackWinsResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       layManagerEntryId,
@@ -636,6 +644,7 @@ export const recordMatchedBetBackWins = createServerFn({ method: 'POST' })
 export const recordMatchedBetLayWins = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordMatchedBetLayWinsInput) => input)
   .handler(async ({ data }): Promise<RecordMatchedBetLayWinsResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       layManagerEntryId,

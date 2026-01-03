@@ -8,14 +8,19 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import { provisionBookieAccounts } from '@/modules/accounts/api/db/accountProvisioner.server'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 import { reverseJournalEntry } from '@/modules/accounts/api/db/journalService.server'
 import {
   shouldCreateJournalEntry,
   isMultiLegParent,
   getMultiLegChildren,
-} from '@/modules/the-furlong/utils/multiLegHelpers'
+} from '@/modules/the-furlong/utils/multiLegHelpers.server'
 import {
   determineMultiLegOutcome,
   calculateMultiLegReturns,
@@ -98,6 +103,7 @@ async function getSystemAccount(
   profileId: string,
   subType: AccountSubType
 ): Promise<{ id: string; code: string; name: string }> {
+  const prisma = await getPrisma()
   const account = await prisma.account.findFirst({
     where: {
       profileId,
@@ -147,6 +153,7 @@ async function getPendingBackAccount(
 export const recordRacingBetPlaced = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordRacingBetPlacedInput) => input)
   .handler(async ({ data }): Promise<RecordRacingBetPlacedResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       trackerEntryId,
@@ -308,6 +315,7 @@ export const recordRacingBetPlaced = createServerFn({ method: 'POST' })
 export const recordRacingWin = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordRacingWinInput) => input)
   .handler(async ({ data }): Promise<RecordRacingWinResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       trackerEntryId,
@@ -534,6 +542,7 @@ export const recordRacingWin = createServerFn({ method: 'POST' })
 export const recordRacingLoss = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordRacingLossInput) => input)
   .handler(async ({ data }): Promise<RecordRacingLossResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       trackerEntryId,
@@ -708,6 +717,7 @@ function getDefaultVoidReason(voidType: VoidType): string {
 export const recordRacingVoid = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordRacingVoidInput) => input)
   .handler(async ({ data }): Promise<RecordRacingVoidResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       trackerEntryId,
@@ -918,6 +928,7 @@ function calculateDeadHeatReturns(
 export const recordRacingDeadHeat = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordRacingDeadHeatInput) => input)
   .handler(async ({ data }): Promise<RecordRacingDeadHeatResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       trackerEntryId,
@@ -1183,6 +1194,7 @@ export const recordRacingDeadHeat = createServerFn({ method: 'POST' })
 export const settleMultiLegBet = createServerFn({ method: 'POST' })
   .inputValidator((input: SettleMultiLegInput) => input)
   .handler(async ({ data }): Promise<SettleMultiLegResult> => {
+    const prisma = await getPrisma()
     const { profileId, parentEntryId, model, bookieId } = data
 
     // Only handle racing model in this file

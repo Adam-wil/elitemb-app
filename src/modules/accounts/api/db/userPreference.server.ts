@@ -5,15 +5,21 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { prisma } from '@/lib/prisma'
 import type { AccountFilter } from '../../types/ledger'
 import { isValidAccountFilter } from '../../types/ledger'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Helper: Get Default Profile ID
 // ============================================================================
 
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   const profile = await prisma.profile.findFirst({
     where: { isDefault: true },
     select: { id: true },
@@ -44,6 +50,7 @@ export interface UserPreferenceData {
 export const getUserPreference = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId?: string }) => d)
   .handler(async ({ data }): Promise<UserPreferenceData> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Try to find existing preference
@@ -82,6 +89,7 @@ export const getUserPreference = createServerFn({ method: 'GET' })
 export const updateLedgerFilter = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId?: string; filter: AccountFilter }) => d)
   .handler(async ({ data }): Promise<UserPreferenceData> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
     const { filter } = data
 
@@ -119,6 +127,7 @@ export const updateLedgerFilter = createServerFn({ method: 'POST' })
 export const updateLastReconciled = createServerFn({ method: 'POST' })
   .inputValidator((d: { profileId?: string }) => d)
   .handler(async ({ data }): Promise<UserPreferenceData> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Upsert preference with current timestamp

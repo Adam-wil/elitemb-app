@@ -8,8 +8,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { UnitTier, TimeValidationStatus } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Types
@@ -50,6 +55,7 @@ export interface PlanEntryUpdate {
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -91,6 +97,7 @@ async function getDefaultProfileId(): Promise<string> {
 export const getPlanEntriesByDate = createServerFn({ method: 'GET' })
   .inputValidator((d: { date: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const date = new Date(data.date)
 
@@ -111,6 +118,7 @@ export const getPlanEntriesByDate = createServerFn({ method: 'GET' })
 export const savePlanEntriesForDate = createServerFn({ method: 'POST' })
   .inputValidator((d: { date: string; entries: PlanEntryInput[] }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const date = new Date(data.date)
 
@@ -162,6 +170,7 @@ export const savePlanEntriesForDate = createServerFn({ method: 'POST' })
 export const updatePlanEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entryId: string; updates: PlanEntryUpdate }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { entryId, updates } = data
 
     const updated = await prisma.racingPlanEntry.update({
@@ -178,6 +187,7 @@ export const updatePlanEntry = createServerFn({ method: 'POST' })
 export const deletePlanEntriesForDate = createServerFn({ method: 'POST' })
   .inputValidator((d: { date: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const date = new Date(data.date)
 
@@ -206,6 +216,7 @@ export const batchUpdateTimeValidation = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const results = await Promise.all(
       data.updates.map((update) =>
         prisma.racingPlanEntry.update({
@@ -228,6 +239,7 @@ export const batchUpdateTimeValidation = createServerFn({ method: 'POST' })
 export const getPlanEntriesByDateRange = createServerFn({ method: 'GET' })
   .inputValidator((d: { startDate: string; endDate: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const startDate = new Date(data.startDate)
     const endDate = new Date(data.endDate)
@@ -252,6 +264,7 @@ export const getPlanEntriesByDateRange = createServerFn({ method: 'GET' })
 export const copyPlanEntries = createServerFn({ method: 'POST' })
   .inputValidator((d: { fromDate: string; toDate: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const fromDate = new Date(data.fromDate)
     const toDate = new Date(data.toDate)

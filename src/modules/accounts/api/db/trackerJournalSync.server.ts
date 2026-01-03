@@ -10,8 +10,14 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { Prisma, JournalEntryType, BetType } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
+
 import type {
   JournalEntryWithLines,
   UpdateTrackerEntryJournalInput,
@@ -110,6 +116,7 @@ function detectChanges(
 export const reverseJournalEntry = createServerFn({ method: 'POST' })
   .inputValidator((input: ReverseJournalInput) => input)
   .handler(async ({ data }): Promise<ReverseJournalResult> => {
+    const prisma = await getPrisma()
     const { originalEntryId, reason } = data
 
     // Find the original entry with lines
@@ -216,6 +223,7 @@ export const canEditTrackerEntry = createServerFn({ method: 'GET' })
     }) => input
   )
   .handler(async ({ data }): Promise<CanEditTrackerEntryResult> => {
+    const prisma = await getPrisma()
     const { entryType, entryId, profileId } = data
 
     // Find all non-voided journal entries for this tracker entry
@@ -298,6 +306,7 @@ export const canEditTrackerEntry = createServerFn({ method: 'GET' })
 export const updateTrackerEntryJournal = createServerFn({ method: 'POST' })
   .inputValidator((input: UpdateTrackerEntryJournalInput) => input)
   .handler(async ({ data }): Promise<UpdateTrackerEntryJournalResult> => {
+    const prisma = await getPrisma()
     const { entryType, entryId, profileId, oldValues, newValues } = data
 
     const referenceType = entryType === 'RACING_TRACKER' ? 'RACING_TRACKER' : 'LAY_MANAGER'
@@ -365,6 +374,8 @@ async function updatePendingEntryInPlace(
   newValues: TrackerEditValues,
   changes: string[]
 ): Promise<UpdateTrackerEntryJournalResult> {
+  const prisma = await getPrisma()
+
   // Only stake changes affect journal amounts
   if (!changes.includes('stake')) {
     return {
@@ -491,6 +502,7 @@ export const getTrackerAuditTrail = createServerFn({ method: 'GET' })
     }) => input
   )
   .handler(async ({ data }): Promise<TrackerAuditTrailEntry[]> => {
+    const prisma = await getPrisma()
     const { entryType, entryId, profileId } = data
 
     const referenceType = entryType === 'RACING_TRACKER' ? 'RACING_TRACKER' : 'LAY_MANAGER'
@@ -547,6 +559,7 @@ export const voidJournalEntry = createServerFn({ method: 'POST' })
     }) => input
   )
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     const { journalEntryId, reason, profileId } = data
 
     const entry = await prisma.journalEntry.findUnique({

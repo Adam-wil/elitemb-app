@@ -8,8 +8,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { UnitTier, RaceOutcome } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 import {
   recordRacingBetPlaced,
   recordRacingWin,
@@ -18,7 +23,7 @@ import {
   recordRacingDeadHeat,
   settleMultiLegBet,
 } from './racingJournalHooks.server'
-import { isMultiLegChild } from '@/modules/the-furlong/utils/multiLegHelpers'
+import { isMultiLegChild } from '@/modules/the-furlong/utils/multiLegHelpers.server'
 import type { VoidType } from '@/modules/accounts/types/journal'
 
 /**
@@ -35,6 +40,8 @@ async function trySettleMultiLegParent(
   childEntryId: string,
   outcome: RaceOutcome
 ): Promise<void> {
+  const prisma = await getPrisma()
+
   // Get the child entry to find its parent
   const childEntry = await prisma.racingTrackerEntry.findUnique({
     where: { id: childEntryId },
@@ -185,6 +192,8 @@ export interface TrackerEntryUpdate {
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
+
   // Find or create default user
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
@@ -227,6 +236,7 @@ async function getDefaultProfileId(): Promise<string> {
 export const getTrackerEntriesByDate = createServerFn({ method: 'GET' })
   .inputValidator((d: { date: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const date = new Date(data.date)
 
@@ -247,6 +257,7 @@ export const getTrackerEntriesByDate = createServerFn({ method: 'GET' })
 export const getTrackerEntriesByDateRange = createServerFn({ method: 'GET' })
   .inputValidator((d: { startDate: string; endDate: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const startDate = new Date(data.startDate)
     const endDate = new Date(data.endDate)
@@ -271,6 +282,7 @@ export const getTrackerEntriesByDateRange = createServerFn({ method: 'GET' })
 export const createTrackerEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entry: TrackerEntryInput }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const { entry } = data
 
@@ -343,6 +355,7 @@ export const createTrackerEntry = createServerFn({ method: 'POST' })
 export const updateTrackerEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entryId: string; updates: TrackerEntryUpdate }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const { entryId, updates } = data
 
     // Get current entry to check for outcome transition
@@ -487,6 +500,7 @@ export const updateTrackerEntry = createServerFn({ method: 'POST' })
 export const deleteTrackerEntry = createServerFn({ method: 'POST' })
   .inputValidator((d: { entryId: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     await prisma.racingTrackerEntry.delete({
       where: { id: data.entryId },
     })
@@ -509,6 +523,7 @@ export const batchUpdateOutcomes = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     // Get current entries to check for outcome transitions
     const entryIds = data.updates.map((u) => u.entryId)
     const currentEntries = await prisma.racingTrackerEntry.findMany({
@@ -659,6 +674,7 @@ export const batchUpdateOutcomes = createServerFn({ method: 'POST' })
 export const getTrackerSummary = createServerFn({ method: 'GET' })
   .inputValidator((d: { startDate: string; endDate: string }) => d)
   .handler(async ({ data }) => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const startDate = new Date(data.startDate)
     const endDate = new Date(data.endDate)

@@ -6,8 +6,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import { recordDepositMatchBonusCredit, voidBonusCredit } from './journalService.server'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Types
@@ -47,6 +52,7 @@ export interface UpdateDepositMatchInput {
 // ============================================================================
 
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let user: any = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
@@ -120,6 +126,7 @@ function toDepositMatchRecord(dm: {
 export const createDepositMatch = createServerFn({ method: 'POST' })
   .inputValidator((d: CreateDepositMatchInput) => d)
   .handler(async ({ data }): Promise<DepositMatchRecord> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Create the deposit match record
@@ -172,6 +179,7 @@ export const createDepositMatch = createServerFn({ method: 'POST' })
 export const getDepositMatches = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId?: string }) => d)
   .handler(async ({ data }): Promise<DepositMatchRecord[]> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     const depositMatches = await prisma.depositMatch.findMany({
@@ -191,6 +199,7 @@ export const getDepositMatches = createServerFn({ method: 'GET' })
 export const getDepositMatchesByBookie = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId?: string; bookieId: number }) => d)
   .handler(async ({ data }): Promise<DepositMatchRecord[]> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     const depositMatches = await prisma.depositMatch.findMany({
@@ -213,6 +222,7 @@ export const getDepositMatchesByBookie = createServerFn({ method: 'GET' })
 export const getDepositMatch = createServerFn({ method: 'GET' })
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }): Promise<DepositMatchRecord | null> => {
+    const prisma = await getPrisma()
     const depositMatch = await prisma.depositMatch.findUnique({
       where: { id: data.id },
       include: {
@@ -231,6 +241,7 @@ export const getDepositMatch = createServerFn({ method: 'GET' })
 export const updateDepositMatch = createServerFn({ method: 'POST' })
   .inputValidator((d: UpdateDepositMatchInput) => d)
   .handler(async ({ data }): Promise<DepositMatchRecord> => {
+    const prisma = await getPrisma()
     const existing = await prisma.depositMatch.findUnique({
       where: { id: data.id },
       include: { Bookie: { select: { name: true } } },
@@ -304,6 +315,7 @@ export const updateDepositMatch = createServerFn({ method: 'POST' })
 export const deleteDepositMatch = createServerFn({ method: 'POST' })
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }): Promise<{ success: boolean }> => {
+    const prisma = await getPrisma()
     const existing = await prisma.depositMatch.findUnique({
       where: { id: data.id },
     })
@@ -343,6 +355,7 @@ export const getDepositMatchSummaryByBookie = createServerFn({ method: 'GET' })
     async ({
       data,
     }): Promise<{ bookieId: number; bookieName: string; totalAmount: number; count: number }[]> => {
+      const prisma = await getPrisma()
       const profileId = data.profileId || (await getDefaultProfileId())
 
       const results = await prisma.depositMatch.groupBy({
@@ -377,6 +390,7 @@ export const getDepositMatchSummaryByBookie = createServerFn({ method: 'GET' })
 export const getDepositMatchTotal = createServerFn({ method: 'GET' })
   .inputValidator((d: { profileId?: string }) => d)
   .handler(async ({ data }): Promise<{ total: number; count: number }> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     const result = await prisma.depositMatch.aggregate({

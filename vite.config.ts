@@ -15,6 +15,16 @@ export default defineConfig({
     tailwindcss(),
   ],
   ssr: {
-    noExternal: ['@mui/x-data-grid', '@mui/x-date-pickers'],
+    // Mark MUI X packages as external for SSR to avoid CSS import issues
+    external: [
+      '@mui/x-data-grid',
+      '@mui/x-data-grid-pro',
+      '@mui/x-data-grid-premium',
+      '@mui/x-date-pickers',
+    ],
+  },
+  optimizeDeps: {
+    // Prevent Vite from pre-bundling server-only packages for the client
+    exclude: ['@prisma/adapter-pg', '@prisma/client', 'pg', 'postgres-bytea', 'pg-types'],
   },
 })

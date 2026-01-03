@@ -8,8 +8,13 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type { LedgerEntryType as PrismaLedgerEntryType } from '@prisma/client'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 import type {
   LedgerEntry,
   AccountBalance,
@@ -29,6 +34,8 @@ import type {
  * Get default profile ID (creates one if needed)
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
+
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -160,6 +167,7 @@ function mapPrismaToAccountBalance(balance: {
 export const getLedgerEntries = createServerFn({ method: 'GET' })
   .inputValidator((input: { filters?: LedgerFilters }) => input)
   .handler(async ({ data }: { data: { filters?: LedgerFilters } }): Promise<LedgerEntry[]> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
     const { filters } = data
 
@@ -204,6 +212,7 @@ export const getLedgerEntries = createServerFn({ method: 'GET' })
 export const getLedgerEntriesByBookie = createServerFn({ method: 'GET' })
   .inputValidator((input: { bookieName: string; limit?: number }) => input)
   .handler(async ({ data }: { data: { bookieName: string; limit?: number } }): Promise<LedgerEntry[]> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const entries = await prisma.accountLedger.findMany({
@@ -224,6 +233,7 @@ export const getLedgerEntriesByBookie = createServerFn({ method: 'GET' })
 export const createLedgerEntry = createServerFn({ method: 'POST' })
   .inputValidator((input: CreateLedgerEntryInput) => input)
   .handler(async ({ data }: { data: CreateLedgerEntryInput }): Promise<LedgerEntry> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Get current balance for this bookie
@@ -310,6 +320,7 @@ export const createLedgerEntry = createServerFn({ method: 'POST' })
 export const getAccountBalances = createServerFn({ method: 'GET' })
   .inputValidator((input: { isExchange?: boolean }) => input)
   .handler(async ({ data }: { data: { isExchange?: boolean } }): Promise<AccountBalance[]> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const where: Record<string, unknown> = { profileId }
@@ -332,6 +343,7 @@ export const getAccountBalances = createServerFn({ method: 'GET' })
 export const getAccountBalance = createServerFn({ method: 'GET' })
   .inputValidator((input: { bookieName: string }) => input)
   .handler(async ({ data }: { data: { bookieName: string } }): Promise<AccountBalance | null> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const balance = await prisma.accountBalance.findUnique({
@@ -352,6 +364,7 @@ export const getAccountBalance = createServerFn({ method: 'GET' })
 export const setBalanceOverride = createServerFn({ method: 'POST' })
   .inputValidator((input: { bookieName: string; overrideValue: number; reason: string }) => input)
   .handler(async ({ data }: { data: { bookieName: string; overrideValue: number; reason: string } }): Promise<AccountBalance> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const balance = await prisma.accountBalance.upsert({
@@ -389,6 +402,7 @@ export const setBalanceOverride = createServerFn({ method: 'POST' })
 export const clearBalanceOverride = createServerFn({ method: 'POST' })
   .inputValidator((input: { bookieName: string }) => input)
   .handler(async ({ data }: { data: { bookieName: string } }): Promise<AccountBalance | null> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const balance = await prisma.accountBalance.update({
@@ -419,6 +433,7 @@ export const clearBalanceOverride = createServerFn({ method: 'POST' })
 export const getLedgerSummary = createServerFn({ method: 'GET' })
   .inputValidator((input: { bookieName?: string; dateRange?: { start: string; end: string } }) => input)
   .handler(async ({ data }: { data: { bookieName?: string; dateRange?: { start: string; end: string } } }): Promise<LedgerSummary> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     const where: Record<string, unknown> = { profileId }
@@ -528,6 +543,7 @@ export const getLedgerSummary = createServerFn({ method: 'GET' })
 export const recalculateBalance = createServerFn({ method: 'POST' })
   .inputValidator((input: { bookieName: string }) => input)
   .handler(async ({ data }: { data: { bookieName: string } }): Promise<AccountBalance> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     // Get all entries for this bookie ordered by date
@@ -596,6 +612,7 @@ export const recalculateBalance = createServerFn({ method: 'POST' })
 export const deleteLedgerEntryByBonusCreditId = createServerFn({ method: 'POST' })
   .inputValidator((input: { bonusCreditId: string }) => input)
   .handler(async ({ data }: { data: { bonusCreditId: string } }): Promise<{ deleted: boolean }> => {
+    const prisma = await getPrisma()
     const profileId = await getDefaultProfileId()
 
     // Find the entry
@@ -645,6 +662,7 @@ export const deleteLedgerEntryByBonusCreditId = createServerFn({ method: 'POST' 
 export const adjustBalance = createServerFn({ method: 'POST' })
   .inputValidator((input: AdjustBalanceInput) => input)
   .handler(async ({ data }: { data: AdjustBalanceInput }): Promise<{ entry: LedgerEntry; balance: AccountBalance }> => {
+    const prisma = await getPrisma()
     const profileId = data.profileId || (await getDefaultProfileId())
 
     // Get current balance

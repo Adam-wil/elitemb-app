@@ -6,7 +6,6 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import prisma from '@/lib/prisma'
 import type {
   JournalEntryType,
   BetType,
@@ -34,9 +33,15 @@ import type {
 } from '../../types/journal'
 import {
   validateJournalEntryComplete,
-} from '../../utils/journalValidation'
+} from '../../utils/journalValidation.server'
 import { provisionBookieAccounts } from './accountProvisioner.server'
 import { JournalBalanceError } from '../../types/journal'
+
+// Dynamic import helper - prevents prisma from being bundled for client
+async function getPrisma() {
+  const { default: prisma } = await import('@/lib/prisma.server')
+  return prisma
+}
 
 // ============================================================================
 // Validation Helpers
@@ -89,6 +94,7 @@ async function validateAccountsExist(
   profileId: string,
   accountIds: string[]
 ): Promise<void> {
+  const prisma = await getPrisma()
   const uniqueAccountIds = [...new Set(accountIds)]
 
   const accounts = await prisma.account.findMany({
@@ -122,6 +128,7 @@ async function validateAccountsExist(
 export const createJournalEntry = createServerFn({ method: 'POST' })
   .inputValidator((input: CreateJournalEntryInput) => input)
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     // Validate line amounts (no negatives, not both debit and credit)
     validateLineAmounts(data.lines)
 
@@ -237,6 +244,7 @@ function mapToJournalEntryWithLines(entry: {
 export const reverseJournalEntry = createServerFn({ method: 'POST' })
   .inputValidator((input: ReverseJournalEntryInput) => input)
   .handler(async ({ data }): Promise<ReversalResult> => {
+    const prisma = await getPrisma()
     const { journalEntryId, reason } = data
 
     // Get original entry with lines
@@ -323,6 +331,7 @@ async function getSystemAccount(
   profileId: string,
   subType: AccountSubType
 ): Promise<{ id: string; code: string; name: string }> {
+  const prisma = await getPrisma()
   const account = await prisma.account.findFirst({
     where: {
       profileId,
@@ -357,6 +366,7 @@ async function getSystemAccount(
 export const createAdjustment = createServerFn({ method: 'POST' })
   .inputValidator((input: CreateAdjustmentInput) => input)
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     const { profileId, accountId, amount, reason, entryDate } = data
 
     // Validate amount
@@ -461,6 +471,7 @@ export const createAdjustment = createServerFn({ method: 'POST' })
 export const createTransfer = createServerFn({ method: 'POST' })
   .inputValidator((input: CreateTransferInput) => input)
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     const { profileId, fromAccountId, toAccountId, amount, description, entryDate } = data
 
     // Validate amount is positive
@@ -561,6 +572,7 @@ export const createTransfer = createServerFn({ method: 'POST' })
 export const createBatchJournalEntries = createServerFn({ method: 'POST' })
   .inputValidator((input: BatchJournalEntryInput) => input)
   .handler(async ({ data }): Promise<BatchCreateResult> => {
+    const prisma = await getPrisma()
     const { profileId, entries } = data
 
     // Edge case: empty array
@@ -674,6 +686,7 @@ export const createBatchJournalEntries = createServerFn({ method: 'POST' })
 export const recordDepositMatch = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordDepositMatchInput) => input)
   .handler(async ({ data }): Promise<DepositMatchResult> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       bookieId,
@@ -848,6 +861,7 @@ export const recordDepositMatch = createServerFn({ method: 'POST' })
 export const recordBonusCredit = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordBonusCreditInput) => input)
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       bookieId,
@@ -955,6 +969,7 @@ export const recordBonusCredit = createServerFn({ method: 'POST' })
  * For asset accounts, balance = total debits - total credits
  */
 async function getAccountBalance(profileId: string, accountId: string): Promise<number> {
+  const prisma = await getPrisma()
   const result = await prisma.journalLine.aggregate({
     where: {
       accountId,
@@ -991,6 +1006,7 @@ async function getAccountBalance(profileId: string, accountId: string): Promise<
 export const recordBonusExpiry = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordBonusExpiryInput) => input)
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     const {
       profileId,
       bookieId,
@@ -1151,6 +1167,7 @@ export interface AdjustBalanceResult {
 export const adjustBalanceByBookie = createServerFn({ method: 'POST' })
   .inputValidator((input: AdjustBalanceByBookieInput) => input)
   .handler(async ({ data }): Promise<AdjustBalanceResult> => {
+    const prisma = await getPrisma()
     let { profileId, bookieName, newBalance, reason, entryDate } = data
 
     // Resolve default profile if not provided
@@ -1281,6 +1298,7 @@ export const adjustBalanceByBookie = createServerFn({ method: 'POST' })
  * Similar helper to ledgerDb.server.ts for consistency
  */
 async function getDefaultProfileId(): Promise<string> {
+  const prisma = await getPrisma()
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
     include: { Profile: { where: { isDefault: true } } },
@@ -1334,6 +1352,7 @@ async function getDefaultProfileId(): Promise<string> {
 export const recordDepositMatchBonusCredit = createServerFn({ method: 'POST' })
   .inputValidator((input: RecordDepositMatchBonusCreditInput) => input)
   .handler(async ({ data }): Promise<RecordDepositMatchBonusCreditResult> => {
+    const prisma = await getPrisma()
     let { profileId, bookieName, amount, notes, bonusCreditId, entryDate } = data
 
     // Resolve default profile if not provided
@@ -1455,6 +1474,7 @@ export const recordDepositMatchBonusCredit = createServerFn({ method: 'POST' })
 export const voidBonusCredit = createServerFn({ method: 'POST' })
   .inputValidator((input: VoidBonusCreditInput) => input)
   .handler(async ({ data }): Promise<JournalEntryWithLines> => {
+    const prisma = await getPrisma()
     const { journalEntryId, reason } = data
 
     // Get the entry
