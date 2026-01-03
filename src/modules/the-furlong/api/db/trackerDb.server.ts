@@ -10,6 +10,124 @@
 import { createServerFn } from '@tanstack/react-start'
 import prisma from '@/lib/prisma'
 import type { UnitTier, RaceOutcome } from '@prisma/client'
+import {
+  recordRacingBetPlaced,
+  recordRacingWin,
+  recordRacingLoss,
+  recordRacingVoid,
+  recordRacingDeadHeat,
+  settleMultiLegBet,
+} from './racingJournalHooks.server'
+import { isMultiLegChild } from '@/modules/the-furlong/utils/multiLegHelpers'
+import type { VoidType } from '@/modules/accounts/types/journal'
+
+/**
+ * Try to settle multi-leg parent when a child leg outcome is updated
+ *
+ * Settlement triggers:
+ * - LOSS on any leg: Settle immediately (early loss)
+ * - All legs settled: Settle with combined outcome
+ *
+ * @param childEntryId - The child leg entry that was just updated
+ * @param outcome - The new outcome of the child leg
+ */
+async function trySettleMultiLegParent(
+  childEntryId: string,
+  outcome: RaceOutcome
+): Promise<void> {
+  // Get the child entry to find its parent
+  const childEntry = await prisma.racingTrackerEntry.findUnique({
+    where: { id: childEntryId },
+    select: {
+      parentBetId: true,
+      isMultiLeg: true,
+      profileId: true,
+      backBookie: true,
+    },
+  })
+
+  if (!childEntry || !isMultiLegChild(childEntry)) {
+    return // Not a child leg, nothing to settle
+  }
+
+  const parentId = childEntry.parentBetId!
+
+  // Get bookie ID for journal entry
+  const bookie = await prisma.bookie.findFirst({
+    where: { name: childEntry.backBookie },
+  })
+
+  // Early loss: Settle immediately if any leg loses
+  if (outcome === 'LOSS') {
+    try {
+      await settleMultiLegBet({
+        data: {
+          profileId: childEntry.profileId,
+          parentEntryId: parentId,
+          model: 'racing',
+          bookieId: bookie?.id,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to settle multi-leg (early loss):', error)
+    }
+    return
+  }
+
+  // Check if all legs are now settled
+  const siblings = await prisma.racingTrackerEntry.findMany({
+    where: { parentBetId: parentId },
+    select: { outcome: true },
+  })
+
+  const allSettled = siblings.every((s) => s.outcome !== 'PENDING')
+
+  if (allSettled) {
+    try {
+      await settleMultiLegBet({
+        data: {
+          profileId: childEntry.profileId,
+          parentEntryId: parentId,
+          model: 'racing',
+          bookieId: bookie?.id,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to settle multi-leg (all legs settled):', error)
+    }
+  }
+}
+
+/**
+ * Extract dead heat divisor from tracker entry data
+ * Checks autoResult first, then outcomeNotes for patterns like "DH 1/3"
+ */
+function extractDeadHeatDivisor(
+  autoResult: Record<string, unknown> | null,
+  outcomeNotes: string | null
+): number {
+  // Check autoResult first (API data)
+  if (autoResult) {
+    if (typeof autoResult.deadHeatDivisor === 'number') {
+      return autoResult.deadHeatDivisor
+    }
+    // If flagged as dead heat but no divisor, default to 2
+    if (autoResult.deadHeat) {
+      return 2
+    }
+  }
+
+  // Check outcomeNotes for manual entry like "DH 1/3" or "Dead Heat 1/2"
+  if (outcomeNotes) {
+    const match = outcomeNotes.match(/(?:DH|Dead\s*Heat)\s*1\/(\d+)/i)
+    if (match) {
+      return parseInt(match[1], 10)
+    }
+  }
+
+  // Default to 2-way dead heat
+  return 2
+}
 
 // ============================================================================
 // Types
@@ -70,25 +188,25 @@ async function getDefaultProfileId(): Promise<string> {
   // Find or create default user
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
-    include: { profiles: { where: { isDefault: true } } },
+    include: { Profile: { where: { isDefault: true } } },
   })
 
   if (!user) {
     user = await prisma.user.create({
       data: {
         email: 'default@elitemb.local',
-        profiles: {
+        Profile: {
           create: {
             name: 'Default Profile',
             isDefault: true,
           },
         },
       },
-      include: { profiles: { where: { isDefault: true } } },
+      include: { Profile: { where: { isDefault: true } } },
     })
   }
 
-  const profile = user.profiles[0]
+  const profile = user.Profile[0]
   if (!profile) {
     const newProfile = await prisma.profile.create({
       data: {
@@ -182,6 +300,40 @@ export const createTrackerEntry = createServerFn({ method: 'POST' })
       },
     })
 
+    // Record journal entry for bet placement
+    try {
+      // Determine if this is a bonus bet (check linkedBonusId on tracker entry)
+      const trackerWithBonus = await prisma.racingTrackerEntry.findUnique({
+        where: { id: created.id },
+        select: { linkedBonusId: true },
+      })
+      const isBonusBet = !!trackerWithBonus?.linkedBonusId
+
+      // Get bookie ID from name
+      const bookie = await prisma.bookie.findFirst({
+        where: { name: entry.backBookie },
+      })
+
+      if (bookie) {
+        await recordRacingBetPlaced({
+          data: {
+            profileId,
+            trackerEntryId: created.id,
+            bookieId: bookie.id,
+            stake: Number(created.backStake),
+            isBonusBet,
+            horseName: created.selectionName,
+            track: created.track,
+            raceNumber: created.raceNumber,
+            entryDate: created.date.toISOString().split('T')[0],
+          },
+        })
+      }
+    } catch (error) {
+      // Log error but don't fail bet placement
+      console.error('Failed to record journal entry for bet placement:', error)
+    }
+
     return { entry: created }
   })
 
@@ -193,6 +345,25 @@ export const updateTrackerEntry = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { entryId, updates } = data
 
+    // Get current entry to check for outcome transition
+    const current = await prisma.racingTrackerEntry.findUnique({
+      where: { id: entryId },
+      select: {
+        outcome: true,
+        outcomeNotes: true,
+        autoResult: true,
+        profileId: true,
+        backBookie: true,
+        backStake: true,
+        backOdds: true,
+        linkedBonusId: true,
+        selectionName: true,
+        track: true,
+        raceNumber: true,
+        date: true,
+      },
+    })
+
     // Convert dates if needed
     const updateData: Record<string, unknown> = { ...updates }
     if (updates.lastPolledAt) {
@@ -203,6 +374,109 @@ export const updateTrackerEntry = createServerFn({ method: 'POST' })
       where: { id: entryId },
       data: updateData,
     })
+
+    // Trigger journal hook if outcome changed to WIN, LOSS, DEAD_HEAT, SCRATCHED, or REFUND
+    if (current && updates.outcome) {
+      const isWin = updates.outcome === 'WIN'
+      const isLoss = updates.outcome === 'LOSS'
+      const isDeadHeat = updates.outcome === 'DEAD_HEAT'
+      const isVoid = updates.outcome === 'SCRATCHED' || updates.outcome === 'REFUND'
+      const wasAlreadySettled =
+        current.outcome === 'WIN' ||
+        current.outcome === 'LOSS' ||
+        current.outcome === 'DEAD_HEAT' ||
+        current.outcome === 'SCRATCHED' ||
+        current.outcome === 'REFUND'
+
+      if ((isWin || isLoss || isDeadHeat || isVoid) && !wasAlreadySettled) {
+        try {
+          const bookie = await prisma.bookie.findFirst({
+            where: { name: current.backBookie },
+          })
+
+          if (bookie) {
+            if (isWin) {
+              await recordRacingWin({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  odds: Number(current.backOdds),
+                  isBonusBet: !!current.linkedBonusId,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } else if (isLoss) {
+              await recordRacingLoss({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  isBonusBet: !!current.linkedBonusId,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } else if (isDeadHeat) {
+              // Extract dead heat divisor from autoResult or outcomeNotes
+              const autoResult = (updates.autoResult || current.autoResult) as Record<string, unknown> | null
+              const outcomeNotes = updates.outcomeNotes || current.outcomeNotes
+              const deadHeatDivisor = extractDeadHeatDivisor(autoResult, outcomeNotes)
+              await recordRacingDeadHeat({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  odds: Number(current.backOdds),
+                  deadHeatDivisor,
+                  isBonusBet: !!current.linkedBonusId,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } else if (isVoid) {
+              // Map RaceOutcome to VoidType
+              const voidType: VoidType = updates.outcome === 'SCRATCHED' ? 'SCRATCHED' : 'REFUND'
+              await recordRacingVoid({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  isBonusBet: !!current.linkedBonusId,
+                  voidType,
+                  reason: updates.outcomeNotes || current.outcomeNotes || undefined,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            }
+          }
+        } catch (error) {
+          // Log error but don't fail the update
+          console.error(`Failed to record journal entry for ${updates.outcome} settlement:`, error)
+        }
+
+        // Try to settle multi-leg parent if this is a child leg
+        try {
+          await trySettleMultiLegParent(entryId, updates.outcome)
+        } catch (error) {
+          console.error('Failed to check multi-leg settlement:', error)
+        }
+      }
+    }
 
     return { entry: updated }
   })
@@ -235,6 +509,27 @@ export const batchUpdateOutcomes = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    // Get current entries to check for outcome transitions
+    const entryIds = data.updates.map((u) => u.entryId)
+    const currentEntries = await prisma.racingTrackerEntry.findMany({
+      where: { id: { in: entryIds } },
+      select: {
+        id: true,
+        outcome: true,
+        outcomeNotes: true,
+        profileId: true,
+        backBookie: true,
+        backStake: true,
+        backOdds: true,
+        linkedBonusId: true,
+        selectionName: true,
+        track: true,
+        raceNumber: true,
+        date: true,
+      },
+    })
+    const currentMap = new Map(currentEntries.map((e) => [e.id, e]))
+
     const results = await Promise.all(
       data.updates.map((update) =>
         prisma.racingTrackerEntry.update({
@@ -248,6 +543,112 @@ export const batchUpdateOutcomes = createServerFn({ method: 'POST' })
         })
       )
     )
+
+    // Trigger journal hooks for entries transitioning to WIN, LOSS, SCRATCHED, REFUND, or DEAD_HEAT
+    for (const update of data.updates) {
+      const current = currentMap.get(update.entryId)
+      if (!current) continue
+
+      const isWin = update.outcome === 'WIN'
+      const isLoss = update.outcome === 'LOSS'
+      const isVoid = update.outcome === 'SCRATCHED' || update.outcome === 'REFUND'
+      const isDeadHeat = update.outcome === 'DEAD_HEAT'
+      const wasAlreadySettled =
+        current.outcome === 'WIN' ||
+        current.outcome === 'LOSS' ||
+        current.outcome === 'SCRATCHED' ||
+        current.outcome === 'REFUND' ||
+        current.outcome === 'DEAD_HEAT'
+
+      if ((isWin || isLoss || isVoid || isDeadHeat) && !wasAlreadySettled) {
+        try {
+          const bookie = await prisma.bookie.findFirst({
+            where: { name: current.backBookie },
+          })
+
+          if (bookie) {
+            if (isWin) {
+              await recordRacingWin({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: update.entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  odds: Number(current.backOdds),
+                  isBonusBet: !!current.linkedBonusId,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } else if (isLoss) {
+              await recordRacingLoss({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: update.entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  isBonusBet: !!current.linkedBonusId,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } else if (isVoid) {
+              // Map RaceOutcome to VoidType
+              const voidType: VoidType = update.outcome === 'SCRATCHED' ? 'SCRATCHED' : 'REFUND'
+              await recordRacingVoid({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: update.entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  isBonusBet: !!current.linkedBonusId,
+                  voidType,
+                  reason: current.outcomeNotes || undefined,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } else if (isDeadHeat) {
+              // Extract dead heat divisor from autoResult
+              const deadHeatDivisor = extractDeadHeatDivisor(
+                update.autoResult as Record<string, unknown> | null,
+                current.outcomeNotes
+              )
+              await recordRacingDeadHeat({
+                data: {
+                  profileId: current.profileId,
+                  trackerEntryId: update.entryId,
+                  bookieId: bookie.id,
+                  stake: Number(current.backStake),
+                  odds: Number(current.backOdds),
+                  deadHeatDivisor,
+                  isBonusBet: !!current.linkedBonusId,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to record journal entry for ${update.outcome} settlement:`, error)
+        }
+
+        // Try to settle multi-leg parent if this is a child leg
+        try {
+          await trySettleMultiLegParent(update.entryId, update.outcome)
+        } catch (error) {
+          console.error('Failed to check multi-leg settlement:', error)
+        }
+      }
+    }
 
     return { updated: results.length }
   })

@@ -10,6 +10,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import prisma from '@/lib/prisma'
 import type { UnitTier, RaceOutcome } from '@prisma/client'
+import { recordMatchedBetPlaced, recordMatchedBetBackWins, recordMatchedBetLayWins } from '@/modules/the-furlong/api/db/layManagerJournalHooks.server'
 
 // ============================================================================
 // Types
@@ -68,25 +69,25 @@ export interface LayEntryUpdate {
 async function getDefaultProfileId(): Promise<string> {
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
-    include: { profiles: { where: { isDefault: true } } },
+    include: { Profile: { where: { isDefault: true } } },
   })
 
   if (!user) {
     user = await prisma.user.create({
       data: {
         email: 'default@elitemb.local',
-        profiles: {
+        Profile: {
           create: {
             name: 'Default Profile',
             isDefault: true,
           },
         },
       },
-      include: { profiles: { where: { isDefault: true } } },
+      include: { Profile: { where: { isDefault: true } } },
     })
   }
 
-  const profile = user.profiles[0]
+  const profile = user.Profile[0]
   if (!profile) {
     const newProfile = await prisma.profile.create({
       data: {
@@ -149,10 +150,10 @@ export const getLayEntriesByDateRange = createServerFn({ method: 'GET' })
  * Create a new lay manager entry
  */
 export const createLayEntry = createServerFn({ method: 'POST' })
-  .inputValidator((d: { entry: LayEntryInput }) => d)
+  .inputValidator((d: { entry: LayEntryInput; linkedBonusId?: string }) => d)
   .handler(async ({ data }) => {
     const profileId = await getDefaultProfileId()
-    const { entry } = data
+    const { entry, linkedBonusId } = data
 
     const created = await prisma.layManagerEntry.create({
       data: {
@@ -176,8 +177,39 @@ export const createLayEntry = createServerFn({ method: 'POST' })
         selectedNormalBookies: entry.selectedNormalBookies || [],
         selectedBetBackBookies: entry.selectedBetBackBookies || [],
         promoDetails: entry.promoDetails || {},
+        linkedBonusId: linkedBonusId || null,
       },
     })
+
+    // Trigger journal hook to record the matched bet placement
+    try {
+      // Look up bookie by name
+      const bookie = await prisma.bookie.findFirst({
+        where: { name: entry.backBookie },
+      })
+
+      if (bookie) {
+        await recordMatchedBetPlaced({
+          data: {
+            profileId,
+            layManagerEntryId: created.id,
+            backBookieId: bookie.id,
+            backStake: entry.backStake,
+            backOdds: entry.backOdds,
+            isBonusBet: !!linkedBonusId,
+            layStake: entry.layStake,
+            layOdds: entry.layOdds,
+            horseName: entry.selectionName,
+            track: entry.track,
+            raceNumber: entry.raceNumber,
+            entryDate: entry.date,
+          },
+        })
+      }
+    } catch (error) {
+      // Log error but don't fail the entry creation
+      console.error('Failed to record journal entry for matched bet:', error)
+    }
 
     return { entry: created }
   })
@@ -190,6 +222,11 @@ export const updateLayEntry = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const { entryId, updates } = data
 
+    // Get current entry to check for outcome transitions
+    const current = await prisma.layManagerEntry.findUnique({
+      where: { id: entryId },
+    })
+
     // Convert dates if needed
     const updateData: Record<string, unknown> = { ...updates }
     if (updates.lastPolledAt) {
@@ -200,6 +237,72 @@ export const updateLayEntry = createServerFn({ method: 'POST' })
       where: { id: entryId },
       data: updateData,
     })
+
+    // Trigger journal hooks for outcome transitions
+    if (current && updates.outcome) {
+      const isWin = updates.outcome === 'WIN'
+      const isLoss = updates.outcome === 'LOSS'
+      const wasAlreadySettled =
+        current.outcome === 'WIN' ||
+        current.outcome === 'LOSS' ||
+        current.outcome === 'SCRATCHED' ||
+        current.outcome === 'REFUND' ||
+        current.outcome === 'DEAD_HEAT'
+
+      if (!wasAlreadySettled) {
+        const bookie = await prisma.bookie.findFirst({
+          where: { name: current.backBookie },
+        })
+
+        if (bookie) {
+          if (isWin) {
+            // Back wins (horse wins) - lay side loses
+            try {
+              await recordMatchedBetBackWins({
+                data: {
+                  profileId: current.profileId,
+                  layManagerEntryId: entryId,
+                  backBookieId: bookie.id,
+                  backStake: Number(current.backStake),
+                  backOdds: Number(current.backOdds),
+                  isBonusBet: !!current.linkedBonusId,
+                  layStake: Number(current.layStake),
+                  layOdds: Number(current.layOdds),
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } catch (error) {
+              console.error('Failed to record journal entry for back wins settlement:', error)
+            }
+          } else if (isLoss) {
+            // Lay wins (horse loses) - back side loses
+            try {
+              await recordMatchedBetLayWins({
+                data: {
+                  profileId: current.profileId,
+                  layManagerEntryId: entryId,
+                  backBookieId: bookie.id,
+                  backStake: Number(current.backStake),
+                  isBonusBet: !!current.linkedBonusId,
+                  layStake: Number(current.layStake),
+                  layOdds: Number(current.layOdds),
+                  layCommissionPercent: current.layCommissionPercent ? Number(current.layCommissionPercent) : 5,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } catch (error) {
+              console.error('Failed to record journal entry for lay wins settlement:', error)
+            }
+          }
+        }
+      }
+    }
 
     return { entry: updated }
   })
@@ -232,6 +335,14 @@ export const batchUpdateLayOutcomes = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    // Get current entries to check for outcome transitions
+    const entryIds = data.updates.map((u) => u.entryId)
+    const currentEntries = await prisma.layManagerEntry.findMany({
+      where: { id: { in: entryIds } },
+    })
+    const currentMap = new Map(currentEntries.map((e) => [e.id, e]))
+
+    // Perform updates
     const results = await Promise.all(
       data.updates.map((update) =>
         prisma.layManagerEntry.update({
@@ -245,6 +356,75 @@ export const batchUpdateLayOutcomes = createServerFn({ method: 'POST' })
         })
       )
     )
+
+    // Trigger journal hooks for entries transitioning to WIN or LOSS
+    for (const update of data.updates) {
+      const current = currentMap.get(update.entryId)
+      if (!current) continue
+
+      const isWin = update.outcome === 'WIN'
+      const isLoss = update.outcome === 'LOSS'
+      const wasAlreadySettled =
+        current.outcome === 'WIN' ||
+        current.outcome === 'LOSS' ||
+        current.outcome === 'SCRATCHED' ||
+        current.outcome === 'REFUND' ||
+        current.outcome === 'DEAD_HEAT'
+
+      if (!wasAlreadySettled && (isWin || isLoss)) {
+        const bookie = await prisma.bookie.findFirst({
+          where: { name: current.backBookie },
+        })
+
+        if (bookie) {
+          if (isWin) {
+            // Back wins (horse wins) - lay side loses
+            try {
+              await recordMatchedBetBackWins({
+                data: {
+                  profileId: current.profileId,
+                  layManagerEntryId: update.entryId,
+                  backBookieId: bookie.id,
+                  backStake: Number(current.backStake),
+                  backOdds: Number(current.backOdds),
+                  isBonusBet: !!current.linkedBonusId,
+                  layStake: Number(current.layStake),
+                  layOdds: Number(current.layOdds),
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } catch (error) {
+              console.error('Failed to record journal entry for back wins settlement:', error)
+            }
+          } else if (isLoss) {
+            // Lay wins (horse loses) - back side loses
+            try {
+              await recordMatchedBetLayWins({
+                data: {
+                  profileId: current.profileId,
+                  layManagerEntryId: update.entryId,
+                  backBookieId: bookie.id,
+                  backStake: Number(current.backStake),
+                  isBonusBet: !!current.linkedBonusId,
+                  layStake: Number(current.layStake),
+                  layOdds: Number(current.layOdds),
+                  layCommissionPercent: current.layCommissionPercent ? Number(current.layCommissionPercent) : 5,
+                  horseName: current.selectionName,
+                  track: current.track,
+                  raceNumber: current.raceNumber,
+                  entryDate: current.date.toISOString().split('T')[0],
+                },
+              })
+            } catch (error) {
+              console.error('Failed to record journal entry for lay wins settlement:', error)
+            }
+          }
+        }
+      }
+    }
 
     return { updated: results.length }
   })
