@@ -556,14 +556,13 @@ export const classifyTransactionsBatch = createServerFn({ method: 'POST' })
 
     for (const txn of data.transactions) {
       try {
-        const classification = await classifyTransaction({
-          data: {
-            description: txn.description,
-            amount: txn.amount,
-            direction: txn.direction,
-            institution: txn.institution,
-            profileId: data.profileId,
-          },
+        // Use core function directly (not server wrapper)
+        const classification = await classifyTransactionCore({
+          description: txn.description,
+          amount: txn.amount,
+          direction: txn.direction,
+          institution: txn.institution,
+          profileId: data.profileId,
         })
 
         results.push({
@@ -709,7 +708,7 @@ export interface ProcessTransactionsResult {
 }
 
 /**
- * Process Basiq transactions through AI classification
+ * Core logic for processing Basiq transactions through AI classification
  *
  * This is the main integration point for Basiq sync.
  * - Skips transactions that are already classified (idempotent)
@@ -717,122 +716,129 @@ export interface ProcessTransactionsResult {
  * - Stores classification results in the database
  * - Auto-journals high-confidence classifications (>= 0.9)
  *
- * Call this after fetching transactions from Basiq.
+ * Exported separately so scripts can call it directly without TanStack context.
  */
-export const processBasiqTransactions = createServerFn({ method: 'POST' })
-  .inputValidator((input: ProcessTransactionsInput) => input)
-  .handler(async ({ data }): Promise<ProcessTransactionsResult> => {
-    const prisma = await getPrisma()
-    const result: ProcessTransactionsResult = {
-      processed: 0,
-      skipped: 0,
-      classified: 0,
-      autoJournaled: 0,
-      pendingReview: 0,
-      ignored: 0,
-      errors: 0,
-    }
+export async function processBasiqTransactionsCore(
+  data: ProcessTransactionsInput
+): Promise<ProcessTransactionsResult> {
+  const prisma = await getPrisma()
+  const result: ProcessTransactionsResult = {
+    processed: 0,
+    skipped: 0,
+    classified: 0,
+    autoJournaled: 0,
+    pendingReview: 0,
+    ignored: 0,
+    errors: 0,
+  }
 
-    // Get existing classifications to skip already-processed transactions
-    const existingIds = await prisma.bankTransactionClassification.findMany({
-      where: {
+  // Get existing classifications to skip already-processed transactions
+  const existingIds = await prisma.bankTransactionClassification.findMany({
+    where: {
+      profileId: data.profileId,
+      basiqTransactionId: { in: data.transactions.map((t) => t.id) },
+    },
+    select: { basiqTransactionId: true },
+  })
+
+  const existingIdSet = new Set(existingIds.map((e) => e.basiqTransactionId))
+
+  // Filter to only new transactions
+  const newTransactions = data.transactions.filter((t) => !existingIdSet.has(t.id))
+  result.skipped = data.transactions.length - newTransactions.length
+
+  // Process each new transaction
+  for (const txn of newTransactions) {
+    result.processed++
+
+    try {
+      // Classify the transaction using core function directly
+      const classification = await classifyTransactionCore({
+        description: txn.description,
+        amount: parseFloat(txn.amount),
+        direction: txn.direction,
+        institution: txn.institution,
         profileId: data.profileId,
-        basiqTransactionId: { in: data.transactions.map((t) => t.id) },
-      },
-      select: { basiqTransactionId: true },
-    })
+      })
 
-    const existingIdSet = new Set(existingIds.map((e) => e.basiqTransactionId))
+      // Store the classification initially
+      const classificationRecord = await prisma.bankTransactionClassification.create({
+        data: {
+          profileId: data.profileId,
+          basiqTransactionId: txn.id,
+          description: txn.description,
+          amount: parseFloat(txn.amount),
+          direction: txn.direction,
+          transactionDate: new Date(txn.transactionDate),
+          institution: txn.institution,
+          classifiedBookieId: classification.bookieId,
+          classifiedBookieName: classification.bookieName,
+          isExchange: classification.isExchange,
+          confidence: classification.confidence,
+          aiReasoning: classification.reasoning,
+          status: classification.status,
+        },
+      })
 
-    // Filter to only new transactions
-    const newTransactions = data.transactions.filter((t) => !existingIdSet.has(t.id))
-    result.skipped = data.transactions.length - newTransactions.length
+      result.classified++
 
-    // Process each new transaction
-    for (const txn of newTransactions) {
-      result.processed++
-
-      try {
-        // Classify the transaction
-        const classification = await classifyTransaction({
-          data: {
-            description: txn.description,
-            amount: parseFloat(txn.amount),
+      // Track status counts and auto-journal if high confidence
+      if (classification.status === 'AUTO_JOURNALED' && classification.bookieId) {
+        try {
+          // Auto-journal: Create bank transaction journal entry
+          const journalResult = await autoJournalClassification({
+            classificationId: classificationRecord.id,
+            profileId: data.profileId,
+            bookieId: classification.bookieId,
+            isExchange: classification.isExchange,
+            amount: Math.abs(parseFloat(txn.amount)),
             direction: txn.direction,
-            institution: txn.institution,
-            profileId: data.profileId,
-          },
-        })
-
-        // Store the classification initially
-        const classificationRecord = await prisma.bankTransactionClassification.create({
-          data: {
-            profileId: data.profileId,
+            transactionDate: txn.transactionDate,
             basiqTransactionId: txn.id,
             description: txn.description,
-            amount: parseFloat(txn.amount),
-            direction: txn.direction,
-            transactionDate: new Date(txn.transactionDate),
             institution: txn.institution,
-            classifiedBookieId: classification.bookieId,
-            classifiedBookieName: classification.bookieName,
-            isExchange: classification.isExchange,
-            confidence: classification.confidence,
-            aiReasoning: classification.reasoning,
-            status: classification.status,
-          },
-        })
+          })
 
-        result.classified++
-
-        // Track status counts and auto-journal if high confidence
-        if (classification.status === 'AUTO_JOURNALED' && classification.bookieId) {
-          try {
-            // Auto-journal: Create bank transaction journal entry
-            const journalResult = await autoJournalClassification({
-              classificationId: classificationRecord.id,
-              profileId: data.profileId,
-              bookieId: classification.bookieId,
-              isExchange: classification.isExchange,
-              amount: Math.abs(parseFloat(txn.amount)),
-              direction: txn.direction,
-              transactionDate: txn.transactionDate,
-              basiqTransactionId: txn.id,
-              description: txn.description,
-              institution: txn.institution,
-            })
-
-            if (journalResult.success) {
-              result.autoJournaled++
-            } else {
-              // Failed to journal - downgrade to pending review
-              await prisma.bankTransactionClassification.update({
-                where: { id: classificationRecord.id },
-                data: { status: 'PENDING_REVIEW' },
-              })
-              result.pendingReview++
-            }
-          } catch (journalError) {
-            console.error(`Failed to auto-journal transaction ${txn.id}:`, journalError)
-            // Downgrade to pending review on error
+          if (journalResult.success) {
+            result.autoJournaled++
+          } else {
+            // Failed to journal - downgrade to pending review
             await prisma.bankTransactionClassification.update({
               where: { id: classificationRecord.id },
               data: { status: 'PENDING_REVIEW' },
             })
             result.pendingReview++
           }
-        } else if (classification.status === 'PENDING_REVIEW') {
+        } catch (journalError) {
+          console.error(`Failed to auto-journal transaction ${txn.id}:`, journalError)
+          // Downgrade to pending review on error
+          await prisma.bankTransactionClassification.update({
+            where: { id: classificationRecord.id },
+            data: { status: 'PENDING_REVIEW' },
+          })
           result.pendingReview++
-        } else if (classification.status === 'IGNORED') {
-          result.ignored++
         }
-      } catch (error) {
-        console.error(`Failed to classify transaction ${txn.id}:`, error)
-        result.errors++
+      } else if (classification.status === 'PENDING_REVIEW') {
+        result.pendingReview++
+      } else if (classification.status === 'IGNORED') {
+        result.ignored++
       }
+    } catch (error) {
+      console.error(`Failed to classify transaction ${txn.id}:`, error)
+      result.errors++
     }
+  }
 
-    return result
+  return result
+}
+
+/**
+ * Process Basiq transactions through AI classification (TanStack server function wrapper)
+ */
+export const processBasiqTransactions = createServerFn({ method: 'POST' })
+  .inputValidator((input: ProcessTransactionsInput) => input)
+  .handler(async ({ data }): Promise<ProcessTransactionsResult> => {
+    return processBasiqTransactionsCore(data)
   })
 
 // ============================================================================
