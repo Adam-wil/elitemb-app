@@ -1,16 +1,20 @@
 /**
- * Bookie P&L Hook (Database-backed)
+ * Bookie P&L Hook (Journal-based)
  *
- * Reads P&L data from the AccountBalance and AccountLedger database tables.
- * This replaces the transaction-based calculation with persisted database values.
+ * Reads P&L data from the AccountBalanceView which calculates balances
+ * from JournalLine entries. Includes:
+ * - Racing Income (per-bookie)
+ * - Bonus Deposit Match Income (per-bookie sign-up bonuses, reloads)
+ * - Racing Expense (per-bookie)
+ *
+ * P&L = Racing Income + Bonus Deposit Match Income - Racing Expense
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { BookiePLRow } from '../types'
-import type { AccountBalance, LedgerEntry } from '../types/ledger'
+import type { BookieAccountData } from '../types/ledger'
+import { getBookieBalancesGrouped } from '../api/db/accountBalanceView.server'
 import {
-  getAccountBalances,
-  getLedgerSummary,
   setBalanceOverride as setBalanceOverrideServer,
   clearBalanceOverride as clearBalanceOverrideServer,
 } from '../api/db/ledgerDb.server'
@@ -49,20 +53,20 @@ interface UseBookiePLReturn {
 // ============================================================================
 
 export function useBookiePL(): UseBookiePLReturn {
-  const [balances, setBalances] = useState<AccountBalance[]>([])
+  const [accounts, setAccounts] = useState<BookieAccountData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   /**
-   * Fetch balances from database
+   * Fetch grouped bookie balances from AccountBalanceView (journal-based)
    */
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
     try {
-      const result = await getAccountBalances({ data: {} })
-      setBalances(result)
+      const result = await getBookieBalancesGrouped({ data: {} })
+      setAccounts(result)
     } catch (err) {
       console.error('useBookiePL fetch error:', err)
       setError(err instanceof Error ? err.message : 'Failed to load P&L data')
@@ -77,33 +81,33 @@ export function useBookiePL(): UseBookiePLReturn {
   }, [fetchData])
 
   /**
-   * Convert AccountBalance to BookiePLRow
+   * Convert BookieAccountData to BookiePLRow
+   *
+   * BookieAccountData includes:
+   * - cashBalance, bonusBalance, totalBalance (from asset accounts)
+   * - totalPL (from income - expense accounts, includes bonus deposit match income)
    */
   const plRows = useMemo((): BookiePLRow[] => {
-    return balances.map((balance): BookiePLRow => {
-      const currentBalance = balance.isOverridden && balance.overrideValue !== null
-        ? balance.overrideValue
-        : balance.currentBalance
-
-      // For now, we don't have separate deposit/withdrawal counts from the balance table
-      // These could be calculated from ledger entries if needed
+    return accounts.map((account): BookiePLRow => {
+      // P&L already includes bonus deposit match income from getBookieBalancesGrouped
+      // Formula: Racing Income + Bonus Deposit Match Income - Racing Expense
       return {
-        bookieId: balance.bookieName, // Using bookieName as ID for now
-        bookieName: balance.bookieName,
-        balance: balance.currentBalance,
-        manualOverride: balance.isOverridden ? balance.overrideValue : null,
-        bonusBalance: 0, // Will be populated from ledger entries with BONUS_CREDIT type
-        depositCount: 0, // Could query from ledger
-        depositAmount: 0, // Could query from ledger
-        withdrawalCount: 0, // Could query from ledger
-        withdrawalAmount: 0, // Could query from ledger
-        netCash: balance.currentBalance,
-        netBonus: 0,
-        totalProfit: balance.totalPL,
-        isProfitable: balance.totalPL > 0,
+        bookieId: account.bookieName, // Using bookieName as ID for now
+        bookieName: account.bookieName,
+        balance: account.cashBalance,
+        manualOverride: null, // TODO: Integrate with actual balance override system
+        bonusBalance: account.bonusBalance,
+        depositCount: 0, // Could query from journal entries if needed
+        depositAmount: 0, // Could query from journal entries if needed
+        withdrawalCount: 0, // Could query from journal entries if needed
+        withdrawalAmount: 0, // Could query from journal entries if needed
+        netCash: account.cashBalance,
+        netBonus: account.bonusBalance,
+        totalProfit: account.totalPL, // Includes racing income + bonus deposit match income - expense
+        isProfitable: account.totalPL > 0,
       }
     }).sort((a, b) => a.bookieName.localeCompare(b.bookieName))
-  }, [balances])
+  }, [accounts])
 
   /**
    * Calculate totals

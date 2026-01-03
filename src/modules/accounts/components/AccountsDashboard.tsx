@@ -13,13 +13,12 @@ import {
   Chip,
   Alert,
 } from '@mui/material'
-import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft, HeartPulse, BookOpen } from 'lucide-react'
+import { RefreshCw, Settings, Wallet, TrendingUp, Building2, ArrowLeft, HeartPulse } from 'lucide-react'
 import { useBasiqConnection } from '../hooks/useBasiqConnection'
 import { useTransactions, getDefaultDateRange } from '../hooks/useTransactions'
-import { useBonusCredits } from '../hooks/useBonusCredits'
 import { useBookiePL } from '../hooks/useBookiePL'
 import { BankAccountsTab } from './BankAccountsTab'
-import { RacingPLTab } from './RacingPLTab'
+import { DepositMatchesTab } from './DepositMatchesTab'
 import { ConnectionSetup } from './ConnectionSetup'
 import { BookieHealthTab } from './BookieHealthTab'
 import { LedgerTab } from './ledger'
@@ -73,16 +72,12 @@ export function AccountsDashboard() {
     autoFetch: isConnected,
   })
 
-  const { bonusCredits, addCredit, removeCredit, getGrandTotal } = useBonusCredits()
 
-  // P&L data from database (not calculated from transactions)
+  // P&L data from database
   const {
-    plRows,
     totalProfit,
     totalBalance,
     totalBonusBalance,
-    setOverride,
-    clearOverride,
     refresh: refreshPL,
     isLoading: plLoading,
   } = useBookiePL()
@@ -251,10 +246,9 @@ export function AccountsDashboard() {
               label={
                 <>
                   <Box sx={{ display: { xs: 'none', sm: 'flex' }, alignItems: 'center', gap: 1 }}>
-                    Racing P&L
-                    <Chip label={plRows.length} size="small" />
+                    Deposit Matches
                   </Box>
-                  <Box sx={{ display: { xs: 'block', sm: 'none' } }}>P&L</Box>
+                  <Box sx={{ display: { xs: 'block', sm: 'none' } }}>Bonuses</Box>
                 </>
               }
             />
@@ -289,17 +283,7 @@ export function AccountsDashboard() {
             <LedgerTab />
           </TabPanel>
           <TabPanel value={tabValue} index={2}>
-            <RacingPLTab
-              plRows={plRows}
-              totalProfit={totalProfit}
-              totalBalance={totalBalance}
-              totalBonusBalance={totalBonusBalance}
-              bonusCredits={bonusCredits}
-              onAddBonusCredit={addCredit}
-              onRemoveBonusCredit={removeCredit}
-              onSetOverride={setOverride}
-              onClearOverride={clearOverride}
-            />
+            <DepositMatchesTab />
           </TabPanel>
           <TabPanel value={tabValue} index={3}>
             <BookieHealthTab />

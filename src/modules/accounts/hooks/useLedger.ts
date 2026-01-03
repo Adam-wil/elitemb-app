@@ -19,12 +19,15 @@ import {
   getAccountBalances,
   getAccountBalance,
   getLedgerSummary,
-  adjustBalance as adjustBalanceServer,
   setBalanceOverride as setBalanceOverrideServer,
   clearBalanceOverride as clearBalanceOverrideServer,
   recalculateBalance as recalculateBalanceServer,
   createLedgerEntry as createLedgerEntryServer,
 } from '../api/db/ledgerDb.server'
+import {
+  adjustBalanceByBookie,
+  type AdjustBalanceResult,
+} from '../api/db/journalService.server'
 
 // ============================================================================
 // Types
@@ -64,7 +67,7 @@ export interface UseLedgerReturn {
   // Actions
   refresh: () => Promise<void>
   selectAccount: (bookieName: string | null) => void
-  adjustBalance: (bookieName: string, newBalance: number, reason: string) => Promise<void>
+  adjustBalance: (bookieName: string, newBalance: number, reason: string) => Promise<AdjustBalanceResult>
   setOverride: (bookieName: string, value: number, reason: string) => Promise<void>
   clearOverride: (bookieName: string) => Promise<void>
   recalculateBalance: (bookieName: string) => Promise<void>
@@ -231,12 +234,13 @@ export function useLedger(options: UseLedgerOptions = {}): UseLedgerReturn {
   }, [])
 
   /**
-   * Adjust balance manually
+   * Adjust balance manually using journal system
+   * Creates a proper double-entry ADJUSTMENT journal entry
    */
   const adjustBalance = useCallback(
     async (name: string, newBalance: number, reason: string) => {
       try {
-        await adjustBalanceServer({
+        const result = await adjustBalanceByBookie({
           data: {
             profileId: '', // Server will use default profile
             bookieName: name,
@@ -249,6 +253,7 @@ export function useLedger(options: UseLedgerOptions = {}): UseLedgerReturn {
         if (selectedBookieName === name) {
           await fetchSelectedEntries()
         }
+        return result
       } catch (err) {
         console.error('adjustBalance error:', err)
         throw err

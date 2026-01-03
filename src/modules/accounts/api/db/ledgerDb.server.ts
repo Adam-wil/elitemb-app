@@ -31,25 +31,25 @@ import type {
 async function getDefaultProfileId(): Promise<string> {
   let user = await prisma.user.findUnique({
     where: { email: 'default@elitemb.local' },
-    include: { profiles: { where: { isDefault: true } } },
+    include: { Profile: { where: { isDefault: true } } },
   })
 
   if (!user) {
     user = await prisma.user.create({
       data: {
         email: 'default@elitemb.local',
-        profiles: {
+        Profile: {
           create: {
             name: 'Default Profile',
             isDefault: true,
           },
         },
       },
-      include: { profiles: { where: { isDefault: true } } },
+      include: { Profile: { where: { isDefault: true } } },
     })
   }
 
-  const profile = user.profiles[0]
+  const profile = user.Profile[0]
   if (!profile) {
     const newProfile = await prisma.profile.create({
       data: {
@@ -671,6 +671,7 @@ export const adjustBalance = createServerFn({ method: 'POST' })
     // Create adjustment entry
     const entry = await prisma.accountLedger.create({
       data: {
+        id: crypto.randomUUID(),
         profileId,
         bookieName: data.bookieName,
         isExchange: currentBalanceRecord?.isExchange || false,
@@ -681,6 +682,7 @@ export const adjustBalance = createServerFn({ method: 'POST' })
         date: new Date(),
         description: 'Manual balance adjustment',
         notes: data.reason,
+        updatedAt: new Date(),
       },
     })
 
@@ -697,13 +699,109 @@ export const adjustBalance = createServerFn({ method: 'POST' })
         lastUpdated: new Date(),
       },
       create: {
+        id: crypto.randomUUID(),
         profileId,
         bookieName: data.bookieName,
         isExchange: false,
         currentBalance: data.newBalance,
         totalPL: 0,
+        updatedAt: new Date(),
       },
     })
+
+    // Also create journal entry in new double-entry system
+    try {
+      // Find the bookie cash account
+      const bookieAccount = await prisma.account.findFirst({
+        where: {
+          profileId,
+          bookieName: data.bookieName,
+          subType: { in: ['BOOKIE_CASH', 'BETFAIR_AVAILABLE'] },
+          isActive: true,
+        },
+      })
+
+      if (bookieAccount) {
+        // Find the ADJUSTMENT system account
+        const adjustmentAccount = await prisma.account.findFirst({
+          where: {
+            profileId,
+            subType: 'ADJUSTMENT',
+            isSystem: true,
+          },
+        })
+
+        if (adjustmentAccount) {
+          const absAmount = Math.abs(difference)
+          const entryId = crypto.randomUUID()
+
+          // Create journal entry with lines
+          await prisma.$transaction(async (tx) => {
+            await tx.journalEntry.create({
+              data: {
+                id: entryId,
+                profileId,
+                entryDate: new Date(),
+                entryType: 'ADJUSTMENT',
+                description: data.reason,
+                referenceType: 'MANUAL_ADJUSTMENT',
+              },
+            })
+
+            if (difference > 0) {
+              // Positive: increase bookie balance
+              // Debit bookie (asset increases), Credit adjustment (equity)
+              await tx.journalLine.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  journalEntryId: entryId,
+                  accountId: bookieAccount.id,
+                  debit: absAmount,
+                  credit: 0,
+                  memo: data.reason,
+                },
+              })
+              await tx.journalLine.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  journalEntryId: entryId,
+                  accountId: adjustmentAccount.id,
+                  debit: 0,
+                  credit: absAmount,
+                  memo: data.reason,
+                },
+              })
+            } else {
+              // Negative: decrease bookie balance
+              // Debit adjustment (equity), Credit bookie (asset decreases)
+              await tx.journalLine.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  journalEntryId: entryId,
+                  accountId: adjustmentAccount.id,
+                  debit: absAmount,
+                  credit: 0,
+                  memo: data.reason,
+                },
+              })
+              await tx.journalLine.create({
+                data: {
+                  id: crypto.randomUUID(),
+                  journalEntryId: entryId,
+                  accountId: bookieAccount.id,
+                  debit: 0,
+                  credit: absAmount,
+                  memo: data.reason,
+                },
+              })
+            }
+          })
+        }
+      }
+    } catch (journalErr) {
+      // Log but don't fail if journal creation fails
+      console.error('Failed to create journal entry for adjustment:', journalErr)
+    }
 
     return {
       entry: mapPrismaToLedgerEntry(entry),

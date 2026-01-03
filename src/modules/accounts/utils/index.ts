@@ -2,6 +2,14 @@
  * Accounts Module Utilities
  */
 
+// Account code generator
+export {
+  ACCOUNT_CODE_RANGES,
+  generateNextAccountCode,
+  generateCodeForType,
+  type AccountCodeRange,
+} from './accountCodeGenerator'
+
 // Bookie list and helpers
 export {
   BOOKIE_DEFINITIONS,
@@ -74,3 +82,12 @@ export {
   // Clear all
   clearAllAccountsData,
 } from './accountsStorage'
+
+// Journal validation
+export {
+  validateAccountsExist,
+  validateJournalLines,
+  validateBalance,
+  validateEntryFields,
+  validateJournalEntryComplete,
+} from './journalValidation'
