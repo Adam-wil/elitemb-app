@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as DevSeedRouteImport } from './routes/dev-seed'
 import { Route as DashboardRouteRouteImport } from './routes/dashboard/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
@@ -26,6 +27,11 @@ import { Route as DashboardAccountsOverviewRouteImport } from './routes/dashboar
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevSeedRoute = DevSeedRouteImport.update({
+  id: '/dev-seed',
+  path: '/dev-seed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRouteRoute = DashboardRouteRouteImport.update({
@@ -98,6 +104,7 @@ const DashboardAccountsOverviewRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
+  '/dev-seed': typeof DevSeedRoute
   '/login': typeof LoginRoute
   '/dashboard/non-promo': typeof DashboardNonPromoRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dev-seed': typeof DevSeedRoute
   '/login': typeof LoginRoute
   '/dashboard/non-promo': typeof DashboardNonPromoRoute
   '/dashboard': typeof DashboardIndexRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteRouteWithChildren
+  '/dev-seed': typeof DevSeedRoute
   '/login': typeof LoginRoute
   '/dashboard/non-promo': typeof DashboardNonPromoRoute
   '/dashboard/': typeof DashboardIndexRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/dashboard'
+    | '/dev-seed'
     | '/login'
     | '/dashboard/non-promo'
     | '/dashboard/'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/dev-seed'
     | '/login'
     | '/dashboard/non-promo'
     | '/dashboard'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/dashboard'
+    | '/dev-seed'
     | '/login'
     | '/dashboard/non-promo'
     | '/dashboard/'
@@ -190,6 +202,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
+  DevSeedRoute: typeof DevSeedRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -200,6 +213,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev-seed': {
+      id: '/dev-seed'
+      path: '/dev-seed'
+      fullPath: '/dev-seed'
+      preLoaderRoute: typeof DevSeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -323,6 +343,7 @@ const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
+  DevSeedRoute: DevSeedRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
