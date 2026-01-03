@@ -320,3 +320,271 @@ VITE_MUI_X_LICENSE_KEY=c9303c1fa5440a8bbad692db058007f9Tz0xLEU9MzI0NzIxNDQwMDAwM
 ### "Key version not found"
 - **Cause**: Using `KV=3` instead of `KV=2`
 - **Fix**: MUI X v7/v8 expects `KV=2`, not `KV=3`
+
+---
+
+# Double-Entry Accounting System Testing
+
+## Overview
+
+The application uses a double-entry accounting system to track bookie balances and P&L from matched betting. The flow is:
+
+```
+Lay Manager Entry → Journal Entry (BET_PLACED) → Journal Lines → AccountBalanceView → Ledger UI
+       ↓
+   Set Outcome → Journal Entry (BET_SETTLED) → Journal Lines → AccountBalanceView → Ledger UI
+```
+
+## Why We Need Dev Seed Data
+
+We cannot get real betting data into the system during development, so we need realistic test data to:
+1. Prove the Lay Manager → Journal → Ledger integration works end-to-end
+2. Verify journal entries are created correctly for bet placement and settlement
+3. Confirm transaction history displays in the AccountDetailSheet
+4. Test different bet outcomes (WIN, LOSS, BONUS WIN, BONUS LOSS, PENDING)
+
+## Dev Seed Script
+
+Location: `src/modules/accounts/api/db/devSeed.server.ts`
+
+The seed script creates:
+- 5 Lay Manager entries with different outcomes
+- 9 journal entries (BET_PLACED + BET_SETTLED for settled bets)
+- Accounts for bookies (Sportsbet, PointsBet, Neds) with Cash and Bonus sub-accounts
+
+### Test Bets Created
+
+| Horse | Bookie | Type | Outcome | Back Stake | Back Odds |
+|-------|--------|------|---------|------------|-----------|
+| Thunder Strike | Sportsbet | Cash | WIN | $50 | 3.5 |
+| Speed Demon | PointsBet | Cash | LOSS | $40 | 4.0 |
+| Golden Arrow | Neds | Bonus | WIN | $100 | 2.8 |
+| Lucky Charm | Sportsbet | Bonus | LOSS | $50 | 4.5 |
+| Morning Star | Sportsbet | Cash | PENDING | $30 | 5.0 |
+
+### Usage
+
+Navigate to `/dev-seed` and click:
+- **Seed Test Data**: Creates entries if none exist
+- **Force Reseed**: Clears and recreates all test data
+- **Clear All Test Data**: Removes all seeded data
+
+## Errors Encountered and Fixes
+
+### 1. AccountBalanceView Migration Not Applied
+
+**Error**: Ledger showing no accounts, balances queries failing
+**Cause**: Migration `20250101000000_create_account_balance_view` existed but wasn't applied
+**Fix**: Run `npx prisma migrate deploy` to apply pending migrations
+
+### 2. Clicking Bookie Card Not Opening Detail Sheet
+
+**Error**: Nothing happens when clicking a bookie in the Ledger tab
+**Cause**: `handleBookieCardClick` tried to find a legacy account from `balances` array, but when empty, `selectedAccount` stayed null and `AccountDetailSheet` returned early with `if (!account) return null`
+**Fix**: Create AccountBalance object from BookieAccountData when no legacy account exists:
+
+```typescript
+// In LedgerTab.tsx - handleBookieCardClick
+if (legacyAccount) {
+  setSelectedAccount(legacyAccount)
+} else {
+  // Create AccountBalance from BookieAccountData
+  setSelectedAccount({
+    id: '',
+    profileId: '',
+    bookieId: bookieData.bookieId,
+    bookieName: bookieData.bookieName,
+    isExchange: bookieData.isExchange,
+    currentBalance: bookieData.totalBalance,
+    totalPL: bookieData.totalPL,
+    lastUpdated: new Date().toISOString(),
+    isOverridden: bookieData.hasVariance,
+  })
+}
+```
+
+### 3. Transaction History Not Loading (profileId Issue)
+
+**Error**: AccountDetailSheet opens but shows "No journal entries found"
+**Cause**: Chain of issues with profileId:
+1. `AccountDetailSheet` receives `profileId` as undefined from `LedgerTab`
+2. Passes `profileId || ''` (empty string) to `JournalEntryList`
+3. `useJournalLines` hook checks `if (!accountId || !profileId || !enabled) return`
+4. Empty string is falsy, so hook returns early without fetching
+
+**Fix**: Made profileId optional throughout the chain:
+
+1. **Server function** (`journalQueries.server.ts`): Derive profileId from account if not provided
+```typescript
+if (!profileId) {
+  const accountLookup = await prisma.account.findUnique({
+    where: { id: accountId },
+    select: { profileId: true },
+  })
+  profileId = accountLookup.profileId
+}
+```
+
+2. **Hook** (`useJournalLines.ts`): Remove profileId from early return check
+```typescript
+// Before: if (!accountId || !profileId || !enabled) return
+// After:
+if (!accountId || !enabled) return
+```
+
+3. **Component** (`JournalEntryList.tsx`): Make profileId optional in props
+```typescript
+export interface JournalEntryListProps {
+  accountId: string
+  profileId?: string  // Now optional
+  // ...
+}
+```
+
+### 4. Bookie Name Case Mismatch
+
+**Error**: "Bookie 'Sportsbet' not found" during seeding
+**Cause**: Existing bookies in database had different casing (e.g., 'sportsbet' vs 'Sportsbet')
+**Fix**: `getOrCreateBookie` searches by both `name` and `normalizedName`, so it finds existing bookies regardless of case. The account gets `bookieName` from the actual Bookie record.
+
+### 5. Server Function RPC Issue
+
+**Error**: Calling `createLayEntry` server function from within another server function returned 0 entries
+**Cause**: Server-to-server RPC calls don't work the same way as client-to-server
+**Fix**: Use Prisma directly for database operations and call journal hooks directly:
+
+```typescript
+// Don't call server functions from server functions
+// Instead, use Prisma directly:
+const entry = await prisma.layManagerEntry.create({ data: {...} })
+
+// Then call journal hooks directly:
+await recordMatchedBetPlaced({ data: {...} })
+```
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/modules/accounts/api/db/devSeed.server.ts` | Dev seed script |
+| `src/routes/dev-seed.tsx` | Dev seed UI page |
+| `src/modules/accounts/api/db/journalQueries.server.ts` | Journal line queries |
+| `src/modules/accounts/hooks/useJournalLines.ts` | Journal lines hook |
+| `src/modules/accounts/components/JournalEntryList.tsx` | Transaction history display |
+| `src/modules/accounts/components/ledger/AccountDetailSheet.tsx` | Bookie detail popup |
+| `src/modules/accounts/components/ledger/LedgerTab.tsx` | Main ledger view |
+| `src/modules/the-furlong/api/db/layManagerJournalHooks.server.ts` | Journal creation on bet events |
+| `prisma/migrations/20250101000000_create_account_balance_view/` | AccountBalanceView SQL |
+
+## Verifying the System Works
+
+1. Run `npx prisma migrate deploy` to ensure all migrations are applied
+2. Navigate to `/dev-seed` and click "Force Reseed"
+3. Go to Accounts tab (Ledger)
+4. You should see bookies with balances (e.g., Sportsbet $145, Neds $180 bonus)
+5. Click on a bookie to see Transaction History with journal entries
+
+---
+
+# Ledger UI Patterns
+
+## Mode-Based Rendering (Performance vs Reconcile)
+
+The Ledger tab uses mode-based rendering to show different UI based on the user's current task:
+
+```typescript
+// Mode is determined by the account filter
+const mode = accountFilter === 'attention' ? 'reconcile' : 'performance'
+
+// Pass mode to components
+<BalanceSummaryCard mode={mode} ... />
+<AccountCard mode={mode} ... />
+```
+
+### Performance Mode (All/Performance/Exchange filters)
+- Full account cards with P&L indicators
+- Cash/bonus split for bookies with bonus balance
+- Total P&L shown in summary card
+- Used for tracking matched betting performance
+
+### Reconcile Mode (Reconcile filter)
+- Simplified cards with balance on right only
+- No P&L indicators (reduces visual noise)
+- P&L hidden in summary card
+- Shows ALL accounts (not filtered by variance)
+- Used for checking actual balances against bookie apps
+
+## Bookie Name Formatting
+
+Bookie names are stored in various cases in the database. Use `formatBookieName()` to display consistently:
+
+```typescript
+// Converts uppercase to title case
+const formatBookieName = (name: string): string => {
+  if (!name) return name
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()
+}
+
+// Examples:
+// "SPORTSBET" → "Sportsbet"
+// "POINTSBET" → "Pointsbet"
+// "neds" → "Neds"
+```
+
+This function is defined in both `AccountCard.tsx` and `AccountDetailSheet.tsx`.
+
+## P&L Consistency
+
+The total P&L in the summary card must match the sum of individual bookie P&Ls:
+
+```typescript
+// In useBookieBalancesGrouped.ts
+const totalPL = accounts.reduce((sum, a) => sum + a.totalPL, 0)
+```
+
+Previously there was a mismatch because:
+- Summary card used a separate aggregate query (all income/expense accounts)
+- Individual cards used per-bookie specific P&L
+
+Now both use the same source: sum of `totalPL` from each bookie in the grouped data.
+
+## Filter Persistence
+
+User's selected filter is persisted to database via `useFilterPersistence` hook:
+
+```typescript
+const {
+  filter: accountFilter,
+  setFilter: setAccountFilter,
+  isLoading: filterLoading,
+} = useFilterPersistence('all')
+```
+
+This syncs across devices since it's stored in the `UserPreference` table.
+
+---
+
+# Technical Debt / Future Fixes
+
+## ProfileId Handling Inconsistency
+
+**Status**: Needs refactoring
+
+**Problem**: The `profileId` handling is inconsistent across server functions in the accounts module:
+- Some functions have `getDefaultProfileId()` fallback (e.g., `getBookieBalancesGrouped`, `recordDepositMatchBonusCredit`)
+- Some functions don't and expect profileId to be passed (caused errors when empty string passed)
+- Hooks like `useLedger` pass `profileId: ''` expecting server to default it
+
+**Current Workaround**: Added `getDefaultProfileId()` fallback to functions as errors are discovered.
+
+**Recommended Fix**: Choose one consistent approach:
+1. **Option A**: Resolve profileId once at the hook level and pass it to all server functions
+2. **Option B**: Create a wrapper/middleware that ensures profileId is resolved before any query
+3. **Option C**: Make all server functions consistently call `getDefaultProfileId()` when profileId is empty
+
+**Files Affected**:
+- `src/modules/accounts/api/db/journalService.server.ts`
+- `src/modules/accounts/api/db/accountBalanceView.server.ts`
+- `src/modules/accounts/api/db/journalQueries.server.ts`
+- `src/modules/accounts/hooks/useLedger.ts`
+- Other hooks that pass profileId to server functions
